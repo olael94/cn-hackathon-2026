@@ -4,10 +4,15 @@ version = "0.1.0"
 description = "RoomPass backend: api, pipeline and translator processes"
 requires-python = ">=3.13"
 dependencies = [
+    "elasticsearch[async]>=9.5.1",
     "fastapi>=0.162.2",
+    "httpx>=0.28.1",
+    "openai>=3.48.0",
     "opentelemetry-distro>=0.66b2",
     "opentelemetry-exporter-otlp>=1.45.2",
     "opentelemetry-instrumentation-fastapi>=0.66b2",
+    "python-multipart>=0.0.33",
+    "sse-starlette>=3.7.0",
     "uvicorn>=0.54.0",
 ]
 
