@@ -1,16 +1,18 @@
 ---
 paths:
   - "CONTRACT.md"
-  - "backend/contract.py"
-  - "web/src/api/contract.ts"
+  - "schema/**"
+  - "backend/roompass/generated/**"
+  - "web/src/types/generated/**"
 ---
 
 # Contract Rules
 
-`backend/` (Python) and `web/` (TypeScript) share data. Keep them in sync by hand, from one file.
+`backend/` (Python) and `web/` (TypeScript) share data through one contract.
 
-- `[CT-01]` `CONTRACT.md` is the single source of truth for every shape, endpoint, status code and SSE event that crosses the boundary.
-- `[CT-02]` `backend/contract.py` (pydantic) and `web/src/api/contract.ts` (zod) mirror it with the same field names and types. No code generation: it costs more time than it saves today.
-- `[CT-03]` A contract change updates `CONTRACT.md`, `contract.py` and `contract.ts` in the same PR.
-- `[CT-04]` Changing the contract is "ask first". Other people are building against it in parallel.
-- `[CT-05]` Every backend route lives under `/api`, because nginx in `web/` only forwards `/api/`.
+- `[CT-01]` `CONTRACT.md` describes every shape, endpoint, status code and SSE event that crosses the boundary. `schema/*.json` (JSON Schema) is its code form.
+- `[CT-02]` Generate types with `scripts/gen-types.sh`, never hand-copy them: pydantic into `backend/roompass/generated/`, TypeScript into `web/src/types/generated/`.
+- `[CT-03]` Generated files are never edited. Change the schema, then regenerate.
+- `[CT-04]` One example per schema in `schema/examples/`.
+- `[CT-05]` A contract change updates `CONTRACT.md`, the schema and the generated files in the same PR, and is "ask first". Other people are building against it in parallel.
+- `[CT-06]` Every backend route lives under `/api`, because nginx in `web/` only forwards `/api/`.

@@ -12,9 +12,9 @@ Built for deaf and hard-of-hearing attendees, second-language listeners, and any
 
 | Feature | What you see |
 |---------|--------------|
-| Live captions | English and Spanish on your phone, with "live · 1.4s behind" |
+| Live captions | English and Spanish on your phone, with "live · 6.2s behind" |
 | Q&A soft match | Type a question; "Possibly covered at 12:04" shows the caption line and score, with a **Still ask** button. A Spanish question matches English captions. |
-| Speaker link | Start, press and hold 3 seconds to stop, questions sorted by votes, one opt-in switch to save the transcript |
+| Speaker link | Start, press and hold 3 seconds to stop, questions sorted by votes |
 | Accessible | Font size, high contrast, screen reader labels, one-handed use, "machine captions, may contain errors" |
 
 AI transcribes and translates. It never decides what is true: "possibly covered" is an Elasticsearch search, not generated text.
@@ -23,25 +23,26 @@ AI transcribes and translates. It never decides what is true: "possibly covered"
 
 1. **Captions with lag.** The speaker talks in English; phones show Spanish captions and the lag. That number is the user-facing side of our SLO.
 2. **Q&A match.** A Spanish question about something said in English comes back "Possibly covered" with the English line and its score.
-3. **Ops.** A chaos flag slows the translator, the lag climbs and the SLO burns in Dash0, Radar and Agent0 point at the translator, and the fallback flag recovers it in seconds.
+3. **Ops.** Dash0 shows the trace of one caption from audio to phone and the lag SLO. Then the real incident we hit today, what Dash0 or Radar found, and the PR that fixed it.
 
 ## How it works
 
 ```text
-speaker mic ──WebSocket──> pipeline (speech to text) ──> Redis Streams ──> translator (EN<->ES)
-                                                              │
-phone page <──SSE── api (FastAPI) <───────────────────────────┘
-                     │
-                     └──> Elasticsearch (segments, passages, questions, talks)
+speaker mic ──5 s audio chunks (HTTP POST)──> api (FastAPI)
+                                               │  OpenAI transcription (EN)
+                                               │  OpenAI translation (EN -> ES)
+                                               ├──> Elasticsearch (talks, segments, questions)
+phone page <──────────── SSE ─────────────────┘
 ```
 
-Rooms are data, not deployments: one install serves any number of rooms. Feature flags (OpenFeature with flagd) switch the speech-to-text provider, the translation fallback and the chaos delay with no deploy.
+Rooms are data, not deployments: one install serves any number of rooms. The full contract between the api and the phone page is in [CONTRACT.md](CONTRACT.md).
 
 ## Repo layout
 
 ```text
 web/       phone page and speaker view: Vite, React, Tailwind, shadcn/ui, Dash0 web SDK
-backend/   Python package roompass: python -m roompass api | pipeline | translator
+backend/   Python package roompass: python -m roompass api (api, audio pipeline and SSE in one process)
+schema/    JSON Schema for every shape in CONTRACT.md; scripts/gen-types.sh generates both sides
 deploy/    Kubernetes manifests Argo CD syncs to our cluster
 plans/     general plan and one file per phase
 brief/     the product brief every phase builds against
@@ -52,8 +53,8 @@ docs/      the full brief, sponsor tool notes, the Radar starter guide
 
 | Tool | What it does here |
 |------|-------------------|
-| Elasticsearch | Stores segments, passages and questions. Hybrid search (BM25 + multilingual semantic) powers cross-language Q&A matching. |
-| Dash0 | One trace per caption segment, audio to phone. Lag SLO (p95 under 3s), real-user monitoring on the phone page. |
+| Elasticsearch | Stores talks, segments and questions. Hybrid search (BM25 + multilingual semantic) powers cross-language Q&A matching. |
+| Dash0 | One trace per caption segment, audio to phone. Lag SLO (p95 under 10 s), real-user monitoring on the phone page. |
 | Radar | Runs on our team's Kubernetes cluster; deploys through Argo CD and Radar's MCP; AI investigations on real failures. |
 | Gitar | Every feature lands through a reviewed PR, with project review rules. |
 
