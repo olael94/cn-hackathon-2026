@@ -91,3 +91,13 @@ Panels: caption lag p50/p95 against the 10 s line, p95 for each pipeline span, p
 - The span name label is assumed to be `otel_span_name`. If the span panels are empty, open the query builder, group `dash0.spans.duration` by span name, and copy the label it uses.
 - The histogram drops negative values. A phone with a bad clock offset can report lag below 0; the web lane should clamp lag to 0 before sending.
 - The phone SDK needs the OTLP over HTTP endpoint and an ingest-only token (`VITE_DASH0_ENDPOINT`, `VITE_DASH0_AUTH_TOKEN`, set in GitHub for the web image build).
+
+## Tooling problems
+
+| When (MT) | Problem | What we did |
+| --- | --- | --- |
+| 2026-11-09, 3:05 PM | The Dash0 web SDK (0.30.0) has no metrics API, only `sendEvent`, so the phone can't report `roompass.caption.lag` as a metric the way CONTRACT.md says. | The phone sends `sendEvent('roompass.caption.lag', ...)` with the lag as an attribute, and a SignalControl rule turns it into a histogram. Not yet confirmed that web events pass through SignalControl. |
+| 2026-11-09, 3:05 PM | Native SLOs use a fixed 28-day window, so the fastest burn alert needs about 2% of the budget in an hour. A 2-minute chaos run may not trip it. | Added a check rule (p95 over 10 s for 30 s) as the alert shown in the demo. |
+| 2026-11-09, 3:05 PM | `backend/Dockerfile` sets `OTEL_SDK_DISABLED=true`, so the backend sends nothing until the `otel` Secret overrides it. | The `otel` Secret must set `OTEL_SDK_DISABLED: "false"`. |
+| 2026-11-09, 3:09 PM | Gitar on PR #14: `[1m]` rate windows can return no data with a 1-minute SignalControl aggregation. | Open. |
+
