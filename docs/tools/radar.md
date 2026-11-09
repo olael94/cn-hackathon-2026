@@ -32,9 +32,28 @@ The pod's events showed readiness and liveness probes refused for the few second
 
 **Fix.** Created Secret `app-credentials` with a random `translator-token` in the Radar UI (outside git), then restarted both Deployments with `manage_workload`. A test talk at 4:12 PM MT returned EN and ES captions, and the translator logged `POST /api/translate HTTP/1.1" 200 OK` with no fallback warning in the backend.
 
+### 2026-11-09: probe and scheduling warnings on every rollout
+
+**What we saw.** After the 4:22 PM MT rollout of `c201d80`, the Radar UI showed `Liveness probe failed: ... connect: connection refused` on pods `backend-6cbc755b7c-wx6h5` and `translator-6cfd8bd5d8-q5sqk`.
+
+**How we found the cause.** `diagnose` on Deployment `backend`: the container started at 4:22:09, the probe failed once at 4:22:12, and `/healthz` returned 200 from then on. 0 restarts, no previous container logs.
+
+**Cause.** The liveness probe starts with no delay. The backend creates the Elasticsearch indices before it listens (`backend/roompass/api.py`), so a slow Elasticsearch could keep it closed past the liveness limit (3 failures, 10 s apart) and get it restarted in a loop.
+
+**Fix.** PR #25: a startup probe on `backend` (`/healthz`, every 2 s, up to 30 tries), so it gets up to 60 s to start. The translator does not wait on Elasticsearch, so it keeps the default.
+
+**Checked again at 4:40 PM MT.** After 8 deploys from 3:37 to 4:39 PM MT (last `1ed4c9e`, sync `6bf74cc`), the Radar UI showed Application `app` `Healthy` with four warnings: startup and readiness probes refused on `backend` and `translator`, and `FailedScheduling` on `app-5997dd6b79-m4lzz` and `translator-64cbb95694-z7j9r` ("0/26 nodes are available: ... 21 node(s) were unschedulable").
+
+- `issues` on `team-the-mok-team` returned 0, and `list_resources` showed all 5 pods `1/1` on `1ed4c9e`.
+- `diagnose` on `backend`: 0 restarts in the last hour. Live requests passed: audio upload, OpenAI transcription, translator `200 OK`, Elasticsearch writes.
+- `get_events` on `app-5997dd6b79-m4lzz`: nominated to a new host node claim (`cnh-xxrqf`) and scheduled 8 s after the last `FailedScheduling`. No `exceeded quota` event, so the shared host nodes were full, not our budget.
+- AI investigation `chat_MzMEPK79-_XVKBYY` on Application `app`, done at 4:41 PM MT: "The Argo CD Application app is synced and healthy, with its latest deployment applied successfully; no action needed." Confidence 0.88. It also flagged the CoreDNS rewrite rule that every team's cluster has.
+
+**Status.** Startup noise from frequent rollouts. No fix needed beyond PR #25.
+
 ## Checks (cluster audit)
 
-`get_cluster_audit` on `team-the-mok-team`: 7 findings, all medium, 0 high. Screenshot: [`../checks-before.webp`](../checks-before.webp).
+`get_cluster_audit` on `team-the-mok-team`: 7 findings, all medium, 0 high. Screenshot: [`radar-checks-before.webp`](radar-checks-before.webp).
 
 | Resource | Check | Decision |
 | --- | --- | --- |
@@ -63,5 +82,5 @@ The pod's events showed readiness and liveness probes refused for the few second
 | 2026-11-09, 3:35 PM | During the PR #17 rollout, Radar showed a Warning `FailedCreatePodSandBox`: `aws-cni` failed to assign an IP address to a new pod. | Host network, not ours to fix. The pod retried on its own and came up; Argo CD stayed `Healthy`. |
 | 2026-11-09, 3:37 PM | After the PR #17 merge, Argo CD synced `9babe01` but not the CI deploy commit `f0f59c1`, so the live images were one build behind. `manage_gitops` sync pinned to `f0f59c1` was refused: "auto-sync is enabled with target revision main". | Ran `manage_gitops` sync with no revision. Argo CD moved to `f0f59c1` and the new images; `/api/health` showed `9babe01`. |
 | 2026-11-09, 3:49 PM | Creating the `openai`, `elastic` and `otel` Secrets: a dry run of `apply_resource` on a Secret echoes its data back (base64) in the tool result, so an agent would see the keys. | Generated the Secret YAML from `.env` with a local script that prints key names only, and the person applied it in the Radar UI. Restarted `backend` and `translator` with `manage_workload`; both rolled out 1/1. |
-| 2026-11-09, 3:55 PM | Every rollout leaves Warning events `Unhealthy` (readiness and liveness `connection refused`) while new pods start. | Logs show uvicorn ready about 2 s after start and no restarts, so it is startup noise. Not changed for the demo. |
+| 2026-11-09, 3:55 PM | Every rollout leaves Warning events `Unhealthy` (readiness and liveness `connection refused`) while new pods start. | Logs show uvicorn ready about 2 s after start and no restarts, so it is startup noise. Changed later for `backend` only: startup probe in PR #25 (see the incident above). |
 | 2026-11-09, 4:00 PM | Radar's node gauges looked busy (one node at 64% CPU, 78% memory). `top_resources` showed `team-the-mok-team` uses about 5m CPU and 170Mi in total, against 450m / 704Mi requested. | The nodes are the shared host, so trimming our Deployments would not relieve them. Left requests as they are until the captions pipeline (PR #19) runs under load, then check `get_rightsizing`. |

@@ -20,9 +20,13 @@ PRs 1 to 3, #10 (flagd and translator manifests) and #18 (Radar audit fixes, `Ru
 | #6 | Edge case | Reconnect replay from Elasticsearch could skip segments not yet refreshed | Taken. Fixed via Gitar (replay from the in-memory buffer first) |
 | #6 | Edge case | In-order processing stalled when a chunk never arrived | Taken. Closed in PR #6 |
 | #6 | Edge case | RollingUpdate surge briefly ran 2 backend pods, splitting SSE | Taken. Fixed via Gitar |
+| #7 | Quality | Documented nginx resolver fix fails on the short name `backend`; use the full Service name | Taken. radar.md and PR #11 use `backend.team-the-mok-team.svc.cluster.local` |
+| #9 | Quality | Healthy lag example 6.2 s falls in the Degrading band (6 to 10 s) | Open |
 | #8 | Quality | Phase 08 (question themes, a stretch) was scheduled H1 to H4 next to the must-have lanes, with no gate (HACK-03) | Taken. Fixed by @melizalde-ds in `d672345`: H4, after 06, only if 05 is on track |
 | #8 | Edge case | Off-topic cutoff 0.5 equals cosine 0 under `(1 + cos) / 2`, so almost nothing would count as off topic | Taken. Fixed by @melizalde-ds in `d672345`: cutoff 0.65, tune on seeded questions |
 | #11 | Bug | Image default `BACKEND_URL=http://backend` now 502s in cluster, because nginx's resolver ignores DNS search domains; any manifest without the override breaks | Open |
+| #12 | Edge case | Badge stays on "Reconnecting" after a reconnect once all captions are shown | Taken. Closed in PR #12 |
+| #12 | Bug | Speaker start, stop and reset break when localStorage is blocked | Taken. Closed in PR #12 |
 | #13 | Quality | Themes endpoint status codes (`503`, empty set for an unknown talk) missing from CONTRACT.md | Taken. Fixed by @melizalde-ds in `5c53237`: both documented in CONTRACT.md |
 | #13 | Quality | Label model name hardcoded in `backend/roompass/themes/labels.py` | Taken. Fixed by @melizalde-ds in `5c53237`: `THEMES_LABEL_MODEL` env var, default `gpt-5.4-mini` |
 | #13 | Edge case | Capped neighbor search: off-topic or seed hits can push real neighbors out, so some themes never form | Taken. Fixed by @melizalde-ds in `5c53237`: search filtered to the on-topic question ids |
@@ -39,9 +43,15 @@ PRs 1 to 3, #10 (flagd and translator manifests) and #18 (Radar audit fixes, `Ru
 | #19 | Security | `POST /api/translate` was public with no token, an open proxy to our OpenAI key | Taken. Fixed via Gitar in `401ee01`: `X-Internal-Token` must match `TRANSLATOR_TOKEN` |
 | #19 | Edge case | A retried or late audio chunk left a stale entry, so every stop waited the full 5 s and the chunk was still transcribed at OpenAI cost | Taken. Fixed via Gitar in `401ee01`: chunks below the next publish seq are ignored before any work |
 | #19 | Quality | Contract sync rule: `TranslateRequest` and `TranslateResponse` lived only in `pipeline.py`, not in `contract.py` or `contract.ts` | Taken. Fixed by @melizalde-ds in `fix/translate-contract`: schemas in `schema/`, types generated for both sides |
+| #21 | Bug | radar.md memory request total 704Mi contradicts the manifests (576Mi) | Open |
+| #21 | Quality | `otel` Secret creation time differs between dash0.md (3:55 PM) and radar.md (3:49 PM) | Open |
+| #21 | Quality | Unapplied `otel` Secret fix in dash0.md should have status `Open` | Open |
+| #22 | Quality | Translate schema accepts any string for `source` and `target`, but CONTRACT.md allows only `en` or `es` | Open |
 | #24 | Bug | No code sends `roompass.caption.late`, so the caption SLO and `CaptionsLate` alert get no data | Taken, with a different fix. Gitar suggested a phone `sendEvent`, but the phone still shows seeded lag. The backend now sets the lag on the `pipeline.publish` span, and the alert, SLO and panels count spans |
 | #24 | Bug | `PipelineErrors` misses translate and index failures, because the caught exceptions never set span status ERROR | Taken. `translate()` and `index_quietly()` now set `StatusCode.ERROR` |
 | #24 | Bug | Chaos panel groups by `roompass.chaos`, which no span sets | Taken in part. Panel now splits by `translator.fallback`, which the code sets. Nothing reads the chaos flag yet: Open |
+| #27 | Quality | Probe and log findings from live Dash0 data had no entry in `docs/tools/dash0.md` (rule "Tool finding is logged" failed) | Taken. Two rows added under Tooling problems in `docs/tools/dash0.md` |
+| #27 | Edge case | Error % panels per stage, service and route show "No data" instead of 0% when a group has no errors | Taken. All three use `or 0 * sum by (...)` to keep a 0 line per group |
 | [#28](https://github.com/olael94/cn-hackathon-2026/pull/28#discussion_r4519361293) | Performance | “Sync SQLite calls block the event loop that serves captions” | Fixed in `8379c3d`. Tested with an exclusive database lock. The event loop kept running while question checks and replay writes waited. Verified Nov 9 at 4:55 PM MST. |
 | [#28](https://github.com/olael94/cn-hackathon-2026/pull/28#discussion_r4519361429) | Quality | “Routing model name is a hardcoded literal” | Fixed in `8379c3d`. Verified the configured model in the request and a warning on fallback, Nov 9 at 4:55 PM MST. |
 | [#28](https://github.com/olael94/cn-hackathon-2026/pull/28#discussion_r4519361548) | Bug | “Audio offsets come from the wall clock, not the audio” | Fixed in `8379c3d`. A browser resumed at 10 seconds of recorded audio after a simulated 125 seconds of talk time. Verified Nov 9 at 4:55 PM MST. |
