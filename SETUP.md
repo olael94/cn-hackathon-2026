@@ -1,75 +1,67 @@
-# Setup status (prepared Nov 9, 2026, ~00:30)
+# Team setup: the-mok-team
 
-TEST to see if Gitar works.
+How our environment is wired. Nothing here is secret; keys live in `.env` (gitignored) and in a
+Kubernetes Secret in the cluster.
 
-Everything below was installed and smoke-tested on this Mac. Nothing here is app code.
-If we don't use a tool, its removal command is in the last section.
+## Services
 
-## Ready and tested
-
-| Tool | Version | Test that passed |
+| Service | What we use | Where |
 |---|---|---|
-| Docker Desktop | 29.9.2, 16 GB RAM | Running |
-| Elasticsearch + Kibana (start-local) | 9.5.6 | API key auth OK; `semantic_text` index matched "Linux kernel packet monitoring" to an eBPF sentence with zero shared words |
-| ELSER (English semantic) | `.elser-2-elasticsearch` | Warm, no download needed on venue Wi-Fi |
-| Multilingual E5 (Spanish) | `.multilingual-e5-small-elasticsearch` | Embedded a Spanish sentence, 384 dims |
-| minikube | Kubernetes 1.33.1, metrics-server on | Node Ready |
-| Radar | 1.20.2 | UI at http://localhost:9280, MCP at `/mcp` registered in Claude Code (Connected) |
-| Dash0 CLI | 1.20.0 | Installed, not logged in yet |
-| gh, helm, uv | 2.103.3, 4.3.1, 0.13.7 | Installed |
-| Python cache | fastapi 0.162, openai 2.54, elasticsearch 9.5, OTel, openlit | Warm in uv cache |
-| Node cache | Next.js 16.4.5, React 19.3, @vercel/otel, OTel web SDK | Warm in pnpm store, test build passed |
-| Base images | python:3.13-slim, node:24-slim, otel collector contrib | Pulled |
+| Cluster | Radar-hosted vcluster `the-mok-team`, namespace `team-the-mok-team` | Radar Cloud: https://app.radarhq.io |
+| Public URL | Argo CD deploys every merge to `main` | https://the-mok-team.cnh.radarhq.io |
+| Build | GitHub Action builds the image to `ghcr.io/olael94/cn-hackathon-2026` (public) | Actions tab |
+| Code review | Gitar reviews every PR | PR comments, https://app.gitar.ai |
+| Search | Elastic Cloud serverless, Vector Database project, AWS us-west-2 | https://cloud.elastic.co |
+| Observability | Dash0 org in us-west-2 (OTLP gRPC) | https://app.dash0.com |
+| AI | OpenAI: `gpt-live-transcribe`, `gpt-transcribe`, `text-embedding-3-small` | https://platform.openai.com |
 
-Repo: `git init` done, `.gitignore` and `.env.example` staged, **not committed yet**.
-`.env` exists (gitignored) with the Elasticsearch values filled in.
+Elastic Cloud's default `semantic_text` model is `.jina-embeddings-v5-text-small` (hosted and
+multilingual). In testing, an English query matched a Spanish sentence with no shared words.
 
-## Verified facts (closes open questions in CLAUDE.md section 11)
+## Joining the team (each teammate)
 
-- OpenAI transcription: `gpt-live-transcribe` (realtime, live mic) and `gpt-transcribe` (recorded chunks, supports `stream=true`). `gpt-4o-transcribe` and `whisper-1` are deprecated (shutdown Feb 26, 2027).
-- OpenAI embeddings: `text-embedding-3-small` (1536 dims), `text-embedding-3-large` (3072 dims).
-- Note: Elasticsearch's built-in ELSER and E5 can replace OpenAI embeddings entirely, which is less code and fewer API calls.
+1. Accept the GitHub invite, then clone:
+   ```bash
+   git clone git@github.com:olael94/cn-hackathon-2026.git
+   ```
+2. Get `.env` from Oliver through AirDrop or a password manager. Never through chat or git.
+3. Accept the Radar Cloud invite and sign in at https://app.radarhq.io. If it says
+   "No Namespace Access", wait two minutes and reload.
+4. Accept the Dash0 invite.
+5. Optional, for Claude Code: add the MCP servers.
+   ```bash
+   claude mcp add --scope user radar-cloud --transport http https://api.radarhq.io/mcp
+   ```
+   Then `/mcp` > radar-cloud > Authenticate > Cloud Native Hackathon.
 
-## YOU must do these (accounts and logins, I can't)
+## How work ships
 
-1. **OpenAI key**: create a key, paste it into `.env` as `OPENAI_API_KEY`. Confirm hackathon credits apply.
-2. **GitHub CLI login**: `gh auth login` (browser flow).
-3. **GitHub repo**: tell me and I'll create it with `gh repo create` (private until submission).
-4. **Gitar**: install the GitHub App on that repo, start the 14-day Pro trial (https://docs.gitar.ai/quickstart).
-5. **Dash0**: sign up (https://www.dash0.com/sign-up). Then:
-   - Settings > Endpoints: copy the OTLP endpoint into `.env`.
-   - Settings > Auth Tokens: copy a token into `DASH0_AUTH_TOKEN`.
-   - `dash0 login --profile default --api-url https://api.<region>.aws.dash0.com`
-   - Add the MCP server: `claude mcp add --transport http --scope local dash0 https://api.<region>.aws.dash0.com/mcp`, then `/mcp` in a Claude terminal to sign in.
-6. **Phone mic test**: Next.js dev server on `0.0.0.0` reached from your phone needs HTTPS for mic access (browsers block `getUserMedia` on plain http except localhost). Plan: `next dev --experimental-https` or a tunnel. Test with real background noise.
+1. Branch from `main`, build the feature, open a PR.
+2. Gitar reviews it. Fix what it flags.
+3. Merge. The Action builds the image and commits `deploy: <sha>` to `main`; Argo CD syncs it.
+4. `git pull` before your next branch (the bot's deploy commit lands on `main`).
 
-## Day-of start commands
+## Secrets in the cluster
 
-```bash
-open -a Docker
-```
-
-```bash
-cd elastic-start-local && sh start.sh
-```
+The deployed app reads keys from Secret `app-credentials` in `team-the-mok-team`. Create it from
+`.env` so no key is pasted anywhere (needs the kubeconfig from Radar Cloud, saved outside the repo
+as `~/cnh-kubeconfig`):
 
 ```bash
-minikube start
+set -a && . ./.env && set +a && KUBECONFIG=~/cnh-kubeconfig kubectl -n team-the-mok-team create secret generic app-credentials --from-literal=openai-api-key="$OPENAI_API_KEY" --from-literal=es-url="$ES_URL" --from-literal=es-api-key="$ES_API_KEY" --from-literal=dash0-auth-token="$DASH0_AUTH_TOKEN" --from-literal=otel-endpoint="$OTEL_EXPORTER_OTLP_ENDPOINT"
 ```
 
-```bash
-radar -no-browser
-```
+## Fallbacks
 
-Kibana: http://localhost:5601 (user `elastic`, password in `elastic-start-local/.env`).
+- `scripts/local-cluster.sh <team>` builds a laptop copy of the hackathon cluster if the shared
+  one has problems.
+- `elastic-start-local/` (gitignored, on Oliver's Mac) is a local Elasticsearch + Kibana:
+  `open -a Docker` then `cd elastic-start-local && sh start.sh`.
 
-## Removal (if a tool isn't used)
+## Known snags
 
-| Remove | Command |
-|---|---|
-| Elasticsearch + Kibana (containers, volumes, folder) | `cd elastic-start-local && sh uninstall.sh` |
-| minikube cluster | `minikube stop` (or `minikube delete` to wipe it) |
-| Radar | `claude mcp remove radar -s local && rm /opt/homebrew/bin/kubectl-radar /opt/homebrew/bin/radar` |
-| Dash0 CLI | `brew uninstall --cask dash0` |
-| gh / helm / uv | `brew uninstall gh helm uv` |
-| Cached images | `docker rmi otel/opentelemetry-collector-contrib:latest` (etc.) |
+- Dash0 MCP OAuth failed with `code_challenge_method must be "S256"`; we registered it with the
+  auth token header instead.
+- Shell-sourcing `.env` needs the OTLP header value quoted, with the space encoded as `%20`.
+- The first two Radar team names (`papachurros`, `mok-team`) failed or were abandoned; ask the
+  Radar table to remove them.

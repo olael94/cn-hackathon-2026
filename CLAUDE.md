@@ -12,7 +12,7 @@
 - **GitHub:** olael94. **Portfolio:** oliver-rivera-portfolio.vercel.app. **LinkedIn:** linkedin.com/in/oliver-rivera-dev
 - **My stack (comfortable):** React/Next.js, Spring Boot, FastAPI, Docker, AWS, GitHub Actions.
 - **New to me (all four sponsor tools):** Gitar/Sonar, Dash0/OpenTelemetry, Radar/Kubernetes, Elasticsearch.
-- **Competing SOLO.** I won my first hackathon (Ensign BUILD) solo and want to repeat that process.
+- **Competing as a team of 3** (changed the night before; GitHub: olael94, melizalde-ds, artcom3). I won my first hackathon (Ensign BUILD) solo; this time we split work by role and land everything through PRs.
 - **Goals:** win, learn new tech, be realistic about what fits the time window.
 
 ### Writing and communication rules
@@ -31,6 +31,8 @@
 - When I say I'm done typing: diff my code against your tested version (ignore comments/spacing), run it, and name exact fixes.
 - Every milestone has a physical "done when" test. Nothing gets built on top of an untested milestone.
 - Commit after every working milestone with a detailed message. Commit before every risky experiment so undo is one command.
+- Humans run every commit and push. Claude drafts commit messages only.
+- Every feature goes on a branch and lands through a PR so Gitar reviews it. Never push features straight to `main` (merging to `main` is what deploys).
 - If I'm more than 45 minutes behind on a milestone, cut LATER scope, never earlier quality.
 - If a feature fails twice near the deadline, cut it and explain the limitation honestly in the demo.
 - Describe bugs by exact behavior. Before accepting a diagnosis, propose a small test that separates the possible causes.
@@ -106,7 +108,7 @@ You can enter multiple tracks at once. A project enters every sponsor track whos
 - Production ready: GitOps deploys, autoscaling, canary or blue-green rollout, fixing what Radar's audit flags.
 - Radar used throughout: agent deploys, debugs, triggers rollouts, checks audits through Radar's MCP.
 - Using Radar's AI SRE to find and fix something real during the day, shown in the demo.
-- **My assessment: steepest learning curve. Probably skip for a 6-hour solo build.**
+- **Update: we are entering this track.** Radar provided a hosted team cluster (`the-mok-team`) with Argo CD already installed, which removes most of the setup cost. See section 12.
 
 ### Track 4: Elasticsearch (Find the Right Talk)
 - Elasticsearch is the CORE data layer, not a side feature.
@@ -184,8 +186,8 @@ Many judges are KubeCon speakers, maintainers and DevRel people. They have perso
 
 ### Elasticsearch: search engine + vector database
 - Search by keyword, by meaning (vector), or both (hybrid). Can be the DB behind search, recommendations and RAG.
-- Run locally (needs Docker; Elasticsearch + Kibana, all features unlocked for a month): `curl -fsSL https://elastic.co/start-local | sh`
-- Or a free Elastic Cloud trial. Query from Python, JavaScript or any client.
+- **We use an Elastic Cloud serverless project** (Vector Database type, AWS us-west-2, 14-day trial), because the app in the Radar cluster cannot reach a laptop. `semantic_text` defaults to `.jina-embeddings-v5-text-small` (hosted, multilingual): an English query matched a Spanish sentence in testing. No OpenAI embeddings needed.
+- A local start-local install (`elastic-start-local/`, gitignored) still exists as an offline fallback. Query from Python, JavaScript or any client.
 - Website idea list: talk search that finds "eBPF and security" sessions even without those words in the title; vector hallway matchmaker; RAG conference assistant over all talk abstracts.
 - Links: https://github.com/elastic/start-local, https://www.elastic.co/docs/solutions/search/get-started, https://github.com/elastic/elasticsearch
 
@@ -275,10 +277,10 @@ A schedule/agenda app is suggested by three sponsors (Sonar, Dash0, Radar). Crow
 - **Frontend:** Next.js mobile web page. Browser audio capture (MediaRecorder / Web Audio). Must work on my phone.
 - **Backend:** FastAPI (Python).
 - **AI:** OpenAI for transcription, summaries, term explanations, embeddings (verify current models).
-- **Data:** Elasticsearch via Docker (start-local). Transcript chunks with timestamps + embeddings; hybrid search.
-- **Observability:** OpenTelemetry auto-instrumentation for FastAPI and Next.js, exported to Dash0. OpenLIT for LLM call tracing. Real-user monitoring on the frontend.
-- **Infra:** Docker Compose for everything. Skip Kubernetes/Radar unless ahead of schedule.
-- **Gitar (optional):** only if shipping features as PRs doesn't slow me down. If used, it must be used all day, not at the end.
+- **Data:** Elastic Cloud serverless (`semantic_text` with hosted multilingual embeddings). Transcript chunks with timestamps; hybrid search.
+- **Observability:** OpenTelemetry auto-instrumentation for FastAPI and Next.js, exported to Dash0. OpenLIT for LLM call tracing. Real-user monitoring on the frontend (needs a separate ingestion-only Dash0 token).
+- **Infra:** Radar's hosted vcluster `the-mok-team`. Merge to `main` → GitHub Action builds image to GHCR → Argo CD deploys to `https://the-mok-team.cnh.radarhq.io`. The starter's `Dockerfile`, `app/` and `deploy/` are placeholders to replace with the real app.
+- **Gitar:** required workflow. Every feature lands through a PR it reviews.
 
 ### Data model idea (Rewind)
 - `talks` index: talk id, title, speaker, room, start time.
@@ -363,7 +365,7 @@ A schedule/agenda app is suggested by three sponsors (Sonar, Dash0, Radar). Crow
 ## 11. Open questions / uncertainties
 - Final idea not locked (leading: Rewind button).
 - Pre-written code allowed? Submission format? Demo length? AI disclosure required?
-- Current OpenAI model names for transcription and embeddings.
+- ~~Current OpenAI model names~~ Resolved: `gpt-live-transcribe` (realtime mic), `gpt-transcribe` (recorded chunks), `text-embedding-3-small` (1536 dims). `whisper-1` and `gpt-4o-transcribe` are deprecated.
 - Prior art for "catch me up" in live in-person talks.
 - Exact Keychron model given away (estimated ~$70 to $100 value, 65% layout, white with red accents).
 
