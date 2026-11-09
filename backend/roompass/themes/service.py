@@ -81,8 +81,12 @@ async def rebuild(talk_id: str) -> ThemeSet:
 
 
 async def latest_theme_set(talk_id: str) -> ThemeSet:
-    if talk_id in _latest:
-        return _latest[talk_id]
+    cached = _latest.get(talk_id)
+    if (
+        cached is not None
+        and (datetime.now(UTC) - cached.built_at).total_seconds() < REBUILD_AFTER_SECONDS
+    ):
+        return cached
     return await rebuild(talk_id)
 
 
