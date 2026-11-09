@@ -36,14 +36,19 @@ def fetch_questions(es: Elasticsearch, talk_id: str) -> list[dict[str, Any]]:
     return [{"id": hit["_id"], **hit["_source"]} for hit in response["hits"]["hits"]]
 
 
-def _semantic_search(talk_id: str, text: str, size: int) -> dict[str, Any]:
+def _semantic_search(
+    talk_id: str, text: str, size: int, ids: list[str] | None = None
+) -> dict[str, Any]:
+    filters: list[dict[str, Any]] = [{"term": {"talk_id": talk_id}}]
+    if ids is not None:
+        filters.append({"ids": {"values": ids}})
     return {
         "size": size,
         "_source": False,
         "query": {
             "bool": {
                 "must": {"semantic": {"field": "semantic", "query": text}},
-                "filter": {"term": {"talk_id": talk_id}},
+                "filter": filters,
             }
         },
     }
@@ -78,8 +83,9 @@ def topic_scores(
 def neighbor_scores(
     es: Elasticsearch, talk_id: str, questions: list[tuple[str, str]]
 ) -> dict[str, dict[str, float]]:
-    size = len(questions)
-    hits = _msearch(es, QUESTIONS_INDEX, [_semantic_search(talk_id, t, size) for _, t in questions])
+    ids = [question_id for question_id, _ in questions]
+    bodies = [_semantic_search(talk_id, t, len(ids), ids) for _, t in questions]
+    hits = _msearch(es, QUESTIONS_INDEX, bodies)
     return {
         question_id: {hit["_id"]: hit["_score"] for hit in neighbors}
         for (question_id, _), neighbors in zip(questions, hits, strict=True)

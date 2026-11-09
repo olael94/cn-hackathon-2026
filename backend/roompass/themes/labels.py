@@ -7,7 +7,7 @@ from pydantic import BaseModel, ValidationError
 from roompass.themes.grouping import ScoredQuestion, label_cites_only
 from roompass.themes.prompts import THEME_LABEL_INSTRUCTIONS, theme_label_input
 
-LABEL_MODEL = "gpt-5.4-mini"
+LABEL_MODEL = os.environ.get("THEMES_LABEL_MODEL", "gpt-5.4-mini")
 MAX_LABEL_LENGTH = 80
 
 
