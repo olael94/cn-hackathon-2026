@@ -11,4 +11,4 @@ resources:
 images:
   - name: app
     newName: ghcr.io/olael94/cn-hackathon-2026
-    newTag: cdda5e7
+    newTag: 03b0411
