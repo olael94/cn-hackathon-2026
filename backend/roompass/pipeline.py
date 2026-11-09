@@ -32,7 +32,7 @@ from pydantic import BaseModel
 from sse_starlette import EventSourceResponse
 
 from roompass import prompts, search
-from roompass.contract import Segment, Talk
+from roompass.contract import Segment, Talk, TranslateRequest, TranslateResponse
 
 log = logging.getLogger("roompass.pipeline")
 tracer = trace.get_tracer("roompass.pipeline")
@@ -67,16 +67,6 @@ class CreateTalkResponse(BaseModel):
 
 class AudioAccepted(BaseModel):
     seq: int
-
-
-class TranslateRequest(BaseModel):
-    text: str
-    source: str = "en"
-    target: str = "es"
-
-
-class TranslateResponse(BaseModel):
-    text: str
 
 
 # ---------- in-memory state per talk ----------
