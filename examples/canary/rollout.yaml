@@ -34,7 +34,7 @@ spec:
               containerPort: 8080
           env:
             - name: TEAM_NAME
-              value: "papachurros"
+              value: "mok-team"
           resources:
             requests:
               cpu: 100m
