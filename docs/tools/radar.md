@@ -18,7 +18,7 @@ The pod's events showed readiness and liveness probes refused for the few second
 
 **Cause.** `web/nginx.conf.template` uses `proxy_pass ${BACKEND_URL};` with a fixed hostname. nginx looks up `backend` once at startup and exits if cluster DNS doesn't answer in time. The second start found it and has served fine since.
 
-**Status.** Written down, not fixed. One restart per rollout is expected; a restart loop is not. The fix is a `resolver` line plus a variable in `proxy_pass`, so nginx looks up `backend` per request instead of once at startup.
+**Status.** Fixed on branch `fix/nginx-dns-resolve`: a `resolver` line plus a variable in `proxy_pass`, so nginx looks up `backend` per request instead of once at startup. `BACKEND_URL` is now the full Service name, because nginx's resolver ignores DNS search domains. New `app` pods should show 0 restarts.
 
 ## Checks (cluster audit)
 
