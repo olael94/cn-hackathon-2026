@@ -68,7 +68,7 @@ Read [`examples/agent-workflows/README.md`](examples/agent-workflows/README.md) 
 ### Project
 
 **[Product]**: [one-line identity from brief/brief.md].
-Built for **Cloud Native Hackathon**, team of 3. Stack: Python (FastAPI) + [frontend framework], on the Radar vcluster `the-mok-team`.
+Built for **Cloud Native Hackathon**, team of 3. Stack: `backend/` Python (FastAPI, uv) + `web/` Vite React (pnpm, Tailwind, shadcn/ui), on the Radar vcluster `the-mok-team`.
 
 Read `brief/brief.md` before touching any feature. Phases live in `plans/00-general.md`.
 
@@ -78,16 +78,17 @@ This is a hackathon build. `.claude/rules/hackathon.md` wins over any stricter r
 
 | Task | Command |
 |------|---------|
-| Install | `[...]` |
-| Dev | `[...]` → `http://localhost:[port]` |
-| Build | `[...]` |
+| Install | `cd backend && uv sync`, `cd web && pnpm install` |
+| Dev | `cd backend && uv run uvicorn main:app --reload` and `cd web && pnpm dev` → `http://localhost:5173` |
+| Build | `cd web && pnpm build`; images: `docker build web`, `docker build backend` |
+| Lint | `cd backend && uv run ruff check && uv run ruff format --check`, `cd web && pnpm lint` |
 | Seed demo data | `[...]` |
 | Deploy | Push to `main`; Argo CD syncs (the `ship` skill) |
 | Live URL | `https://the-mok-team.cnh.radarhq.io` |
 
 ### Walk the demo
 
-1. Start with `[dev command]`, open `[url]`.
+1. Start both dev servers (Commands above), open `http://localhost:5173`.
 2. Log in as `[seeded user]` if there is auth.
 3. Follow the demo path in `brief/brief.md` step by step in a browser tool.
 4. Check phone width (375px).
@@ -103,7 +104,6 @@ Claude loads these by file type. Other agents: read only the files for the area 
 | `.claude/rules/ai.md` | Always (where the model goes) |
 | `.claude/rules/git.md` | Always |
 | `.claude/rules/react.md` | Any `.ts` or `.tsx` |
-| `.claude/rules/next.md` | Next.js app (delete if Vite) |
 | `.claude/rules/vite.md` | Vite SPA (delete if Next) |
 | `.claude/rules/python.md` | `.py`, `pyproject.toml` |
 | `.claude/rules/contract.md` | `schema/`, or any code that crosses languages |
