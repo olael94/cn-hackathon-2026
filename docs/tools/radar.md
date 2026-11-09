@@ -8,6 +8,8 @@ The app runs on Radar's hosted vcluster `the-mok-team`, namespace `team-the-mok-
 
 **What we saw.** After the 2:43 PM MT rollout of `web-0a547db`, Radar showed pod `app-7ff49f4c97-n7slg` with 1 restart, last terminated reason `Error`. The app stayed up: Argo CD `Synced` and `Healthy` at `d248ebe`, 4 of 4 pods ready, `/` and `/api/health` both returned 200.
 
+**Seen again.** The 2:55 PM MT rollout of `web-257e5d7` (PR #6 merge, deploy commit `75332d9`) restarted every new `app` pod once with the same log line. Radar raised two warnings on Deployment `app`, including `LivenessProbeFailed`. Fix: PR #11.
+
 **How we found the cause.** `diagnose` on the pod returned the previous container's logs:
 
 ```
@@ -31,3 +33,9 @@ The pod's events showed readiness and liveness probes refused for the few second
 | `app` | 2 replicas, no topology spread | To decide |
 | `app`, `backend` | Service account token auto-mounted | To decide. Neither pod calls the Kubernetes API. |
 | `app`, `backend` | Root filesystem not read-only | To decide. nginx writes its config at startup, so it would need an `emptyDir`. |
+
+## Tooling problems
+
+| When (MT) | Problem | What we did |
+| --- | --- | --- |
+| 2026-11-09, 3:00 PM | `top_resources` for the budget check (PR #10): the pre-installed pods' CPU limits already add up to 5750m, over the documented 4 CPU limit budget, so the quota probably doesn't count them. Not confirmed. | Treated our own Deployments' totals as the budget. After PR #10, `team-the-mok-team` requests 450m CPU / 576Mi and limits 2200m / 1152Mi (from `deploy/*.yaml`). The whole cluster, pre-installed pods included, requests 980m / 1856Mi. |
