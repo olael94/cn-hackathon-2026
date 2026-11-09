@@ -14,7 +14,7 @@
    - Use crisp `1px solid` or `2px solid` borders for hierarchy.
    - Maximum border radius is `4px` (`--radius: 4px`) for buttons/inputs and `0px` or `4px` for structural cards. Never use pill-shaped cards (`rounded-2xl` / `rounded-3xl`).
 3. **Tabular Numerals Everywhere:**
-   - Every timestamp (`12:04`), segment ID (`#042`), lag readout (`live · 1.4s behind`), similarity score (`0.89`), vote count, and countdown timer MUST use `--font-mono` with `font-variant-numeric: tabular-nums` so numbers never jitter horizontally during live updates.
+   - Every timestamp (`12:04`), segment ID (`#042`), lag readout (`live · 6.2s behind`), similarity score (`0.89`), vote count, and countdown timer MUST use `--font-mono` with `font-variant-numeric: tabular-nums` so numbers never jitter horizontally during live updates.
 4. **Use the existing web stack:**
    - Build in `web/` (Vite, React, strict TypeScript, Tailwind, shadcn/ui). Do not add a second static frontend or serve HTML from FastAPI.
    - Map the tokens in section 2 onto the shadcn CSS variables in `web/src/index.css` (see the token map below). Register the extra tokens in `@theme inline` as `--color-<name>` so Tailwind classes like `border-ok` and `bg-danger-tint` work.
@@ -60,11 +60,11 @@ RoomPass defaults to **Swiss Civic Obsidian** (`data-theme="swiss"`), engineered
   --accent: #FFBE0B;           /* Safety Amber */
   --accent-ink: #000000;       /* Text on Amber buttons */
   --accent-tint: #261C00;
-  --ok: #00F5D4;               /* Telemetry Healthy (< 2.0s) */
+  --ok: #00F5D4;               /* Telemetry Healthy (<= 6s) */
   --ok-tint: #002924;
-  --warn: #FB5607;             /* Telemetry Warning (2.0s - 3.0s) */
+  --warn: #FB5607;             /* Telemetry Warning (6s - 10s) */
   --warn-tint: #2E1000;
-  --danger: #FF006E;           /* Chaos / SLO Burn (> 3.0s) */
+  --danger: #FF006E;           /* SLO Burn (> 10s) */
   --danger-tint: #330016;
   --status-color: var(--ok);
 }
@@ -152,9 +152,9 @@ Agents must embed this exact inline SVG in the top header of both the Attendee P
 ### 4.1 Header & User-Facing Dash0 SLO Lag Indicator
 - **Formula:** `lag = phone_receive_time - (started_at + t_end) + clock_offset` (from SSE `hello` event).
 - **Visual States:**
-  - `lag <= 2.0s`: Healthy (`--ok` border & dot, text: `LIVE · 1.4s behind`)
-  - `2.0s < lag <= 3.0s`: Degrading (`--warn` border & dot, text: `LIVE · 2.6s behind`)
-  - `lag > 3.0s`: SLO Burn (`--danger` border, `--danger-tint` background, text: `LAG · 4.8s behind`)
+  - `lag <= 6s`: Healthy (`--ok` border & dot, text: `LIVE · 6.2s behind`)
+  - `6s < lag <= 10s`: Degrading (`--warn` border & dot, text: `LIVE · 8.1s behind`)
+  - `lag > 10s`: SLO Burn (`--danger` border, `--danger-tint` background, text: `LAG · 12.4s behind`)
 - **Required Disclaimer:** Always show `"Machine captions · may contain errors"` directly below the header.
 
 ```html
@@ -166,17 +166,19 @@ Agents must embed this exact inline SVG in the top header of both the Attendee P
   <!-- Live SLO Telemetry Readout -->
   <div id="slo-badge" class="mono" role="status" aria-live="polite" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; background:var(--ok-tint); border:2px solid var(--ok); color:var(--text); font-size:12px; font-weight:700; border-radius:var(--radius);">
     <span id="slo-dot" style="width:8px; height:8px; background:var(--ok); display:inline-block;"></span>
-    <span id="slo-text">LIVE · 1.4s behind</span>
+    <span id="slo-text">LIVE · 6.2s behind</span>
   </div>
 </header>
 
 <div class="mono" style="display:flex; justify-content:space-between; padding:6px 14px; background:var(--surface-raised); border-bottom:1px solid var(--border); font-size:11px; color:var(--text-muted);">
   <span>MACHINE CAPTIONS · MAY CONTAIN ERRORS</span>
-  <span>SLO p95 &lt; 3.0s</span>
+  <span>SLO p95 &lt; 10s</span>
 </div>
 ```
 
 ### 4.2 Bilingual Caption Stream (`partial` vs `segment`)
+
+> **Not in CONTRACT.md:** there is no `partial` event (audio arrives in 5 s chunks). Skip the partial box; render only `segment` events.
 - **Layout:** Single-column vertical feed with `padding-bottom: 96px` so the sticky bottom thumb bar never obscures the active caption line.
 - **Language Selection:**
   - Primary language selected by user (`EN` or `ES`) renders at `font-size: var(--caption-size); font-weight: 700; color: var(--text)`.
@@ -190,10 +192,10 @@ Agents must embed this exact inline SVG in the top header of both the Attendee P
   <article data-segment-id="seg-041" style="padding-left:12px; border-left:2px solid var(--border);">
     <div class="mono" style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">12:04 · #041</div>
     <p style="margin:0; font-size:var(--caption-size); line-height:1.4; font-weight:700;">
-      Los teléfonos se reconectan con SSE Last-Event-ID y recuperan datos de Redis Streams.
+      El autoescalado solo ayuda si tus solicitudes están bien configuradas.
     </p>
     <p style="margin:4px 0 0 0; font-size:calc(var(--caption-size) * 0.78); line-height:1.35; color:var(--text-muted);">
-      Phones resume with SSE Last-Event-ID and backfill from Redis Streams.
+      Autoscaling only helps if your requests are set correctly.
     </p>
   </article>
 
@@ -212,7 +214,7 @@ Agents must embed this exact inline SVG in the top header of both the Attendee P
   <div id="partial-box" style="padding:10px 12px; background:var(--surface); border:1px dashed var(--border-strong); border-radius:var(--radius);">
     <div class="mono" style="font-size:10px; color:var(--accent); text-transform:uppercase; margin-bottom:2px;">LIVE AUDIO (EN)...</div>
     <p id="partial-text" style="margin:0; font-size:calc(var(--caption-size) * 0.9); color:var(--text-muted);">
-      And when we trigger the delay flag through OpenFeature...
+      So the first thing to check is your resource requests...
     </p>
   </div>
 
@@ -224,7 +226,7 @@ Agents must embed this exact inline SVG in the top header of both the Attendee P
 - **Required Elements:**
   1. Timestamp (`Possibly covered at 12:04`)
   2. Exact matched caption line (`text_en` or `text_es`)
-  3. Raw cosine match score (`MATCH: 0.89`)
+  3. Semantic match score (see CONTRACT.md, Match) (`MATCH: 0.89`)
   4. **`Still ask`** override button (must always be available so the user is never blocked).
 
 ```html
@@ -239,7 +241,7 @@ Agents must embed this exact inline SVG in the top header of both the Attendee P
       <span>SCORE: 0.89</span>
     </div>
     <blockquote style="margin:0; font-size:14px; line-height:1.4; color:var(--text);">
-      "Phones resume with SSE Last-Event-ID and backfill from Redis Streams."
+      "Autoscaling only helps if your requests are set correctly."
     </blockquote>
   </div>
 

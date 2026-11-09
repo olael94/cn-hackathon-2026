@@ -1,0 +1,1 @@
+{ "id": "k8s7fa-12", "talk_id": "k8s7fa", "seq": 12, "t_start": 60.0, "t_end": 65.0, "text_en": "Autoscaling only helps if your requests are set correctly.", "text_es": "El autoescalado solo ayuda si tus solicitudes están bien configuradas.", "emitted_at": "2026-11-09T21:04:12.381Z" }

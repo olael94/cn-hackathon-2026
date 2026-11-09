@@ -3,8 +3,9 @@
 This file is the agreement between `backend/` and `web/`. Build against it in parallel.
 Changing anything here is "ask the team first", and the change lands in the same PR as the code.
 
-- Backend: pydantic models in `backend/roompass/contract.py` mirror this file.
-- Frontend: zod schemas in `web/src/api/contract.ts` mirror this file.
+- Code: every shape below has a JSON Schema in `schema/<name>.json` with one example in `schema/examples/<name>.json`.
+- `scripts/gen-types.sh` generates pydantic models into `backend/roompass/generated/` and TypeScript types into `web/src/types/generated/`. Never edit generated files: change the schema, then regenerate.
+- Import shared shapes only from `backend/roompass/contract.py` and `web/src/api/contract.ts`. They re-export the generated types.
 - Every path is under `/api`, because nginx in `web/` only forwards `/api/` to the backend.
 
 ## Conventions
@@ -217,4 +218,4 @@ Never put transcript text or question text in span attributes or logs. IDs, coun
 | Platform, Dash0, Radar, Gitar | Miguel | `deploy/`, `.github/`, `.gitar/`, telemetry setup, `docs/tools/` |
 | Question themes | Miguel | `backend/roompass/themes/` |
 
-Shared: `CONTRACT.md`, `backend/roompass/contract.py`, `web/src/api/contract.ts`. Change them only with the team's OK.
+Shared: `CONTRACT.md`, `schema/`, `backend/roompass/contract.py`, `web/src/api/contract.ts`, and the generated folders. Change them only with the team's OK.

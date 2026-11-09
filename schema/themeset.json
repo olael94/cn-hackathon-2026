@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ThemeSet",
+  "type": "object",
+  "properties": {
+    "talk_id": { "type": "string" },
+    "themes": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "title": "Theme",
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "question_ids": { "type": "array", "items": { "type": "string" }, "minItems": 2 },
+          "top_question_id": { "type": "string" },
+          "votes": { "type": "integer", "minimum": 0 }
+        },
+        "required": ["id", "label", "question_ids", "top_question_id", "votes"],
+        "additionalProperties": false
+      }
+    },
+    "question_count": { "type": "integer", "minimum": 0 },
+    "off_topic_count": { "type": "integer", "minimum": 0 },
+    "built_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["talk_id", "themes", "question_count", "off_topic_count", "built_at"],
+  "additionalProperties": false
+}
