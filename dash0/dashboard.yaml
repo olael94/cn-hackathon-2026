@@ -1,0 +1,200 @@
+apiVersion: perses.dev/v1alpha1
+kind: PersesDashboard
+metadata:
+  name: roompass-health
+  labels:
+    dash0.com/id: roompass-health
+spec:
+  display:
+    name: RoomPass health
+  duration: 1h
+  panels:
+    lateCaptions:
+      kind: Panel
+      spec:
+        display:
+          name: Late captions (%)
+          description: Share of captions published more than 10 s after their audio arrived. SLO is under 5%, the same as p95 lag under 10 s.
+        plugin:
+          kind: TimeSeriesChart
+          spec: {}
+        queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  query: 100 * sum(rate({otel_metric_name="dash0.spans", otel_span_name="pipeline.publish", roompass_caption_late="true"}[2m])) / sum(rate({otel_metric_name="dash0.spans", otel_span_name="pipeline.publish", roompass_caption_late=~"true|false"}[2m]))
+                  seriesNameFormat: late %
+    captionsDelivered:
+      kind: Panel
+      spec:
+        display:
+          name: Captions delivered per minute
+        plugin:
+          kind: TimeSeriesChart
+          spec: {}
+        queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  query: 60 * sum by (roompass_caption_late) (rate({otel_metric_name="dash0.spans", otel_span_name="pipeline.publish", roompass_caption_late=~"true|false"}[2m]))
+                  seriesNameFormat: "late={{roompass_caption_late}}"
+    pipelineLatency:
+      kind: Panel
+      spec:
+        display:
+          name: Pipeline stage p95 (s)
+          description: transcribe, translate, index and publish, one trace per audio chunk.
+        plugin:
+          kind: TimeSeriesChart
+          spec: {}
+        queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  query: histogram_quantile(0.95, sum by (le, otel_span_name) (rate({otel_metric_name="dash0.spans.duration", otel_span_name=~"pipeline\\..*"}[2m])))
+                  seriesNameFormat: "{{otel_span_name}}"
+    pipelineErrors:
+      kind: Panel
+      spec:
+        display:
+          name: Pipeline errors per minute
+        plugin:
+          kind: TimeSeriesChart
+          spec: {}
+        queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  query: 60 * sum by (otel_span_name) (rate({otel_metric_name="dash0.spans", otel_span_name=~"pipeline\\..*", otel_span_status_code="ERROR"}[2m]))
+                  seriesNameFormat: "{{otel_span_name}}"
+    chaosFlag:
+      kind: Panel
+      spec:
+        display:
+          name: Translate p95 by fallback (s)
+          description: Splits pipeline.translate by translator.fallback, so you can see whether the remote translator or the local fallback did the work.
+        plugin:
+          kind: TimeSeriesChart
+          spec: {}
+        queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  query: histogram_quantile(0.95, sum by (le, translator_fallback) (rate({otel_metric_name="dash0.spans.duration", otel_span_name="pipeline.translate"}[2m])))
+                  seriesNameFormat: "fallback={{translator_fallback}}"
+    questionsLatency:
+      kind: Panel
+      spec:
+        display:
+          name: Q&A match and themes p95 (s)
+        plugin:
+          kind: TimeSeriesChart
+          spec: {}
+        queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  query: histogram_quantile(0.95, sum by (le, otel_span_name) (rate({otel_metric_name="dash0.spans.duration", otel_span_name=~"questions.check|themes.build|catchup.generate"}[2m])))
+                  seriesNameFormat: "{{otel_span_name}}"
+    requests:
+      kind: Panel
+      spec:
+        display:
+          name: Requests per second
+        plugin:
+          kind: TimeSeriesChart
+          spec: {}
+        queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  query: sum by (service_name) (rate({otel_metric_name="dash0.spans", otel_span_kind="SERVER"}[2m]))
+                  seriesNameFormat: "{{service_name}}"
+    serverErrors:
+      kind: Panel
+      spec:
+        display:
+          name: Server errors per minute
+        plugin:
+          kind: TimeSeriesChart
+          spec: {}
+        queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  query: 60 * sum by (service_name) (rate({otel_metric_name="dash0.spans", otel_span_kind="SERVER", otel_span_status_code="ERROR"}[2m]))
+                  seriesNameFormat: "{{service_name}}"
+    serverLatency:
+      kind: Panel
+      spec:
+        display:
+          name: Server p95 latency (s)
+        plugin:
+          kind: TimeSeriesChart
+          spec: {}
+        queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  query: histogram_quantile(0.95, sum by (le, service_name) (rate({otel_metric_name="dash0.spans.duration", otel_span_kind="SERVER"}[2m])))
+                  seriesNameFormat: "{{service_name}}"
+    uptime:
+      kind: Panel
+      spec:
+        display:
+          name: Public URL uptime check
+        plugin:
+          kind: TimeSeriesChart
+          spec: {}
+        queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  query: sum by (dash0_synthetic_check_outcome) (increase({otel_metric_name="dash0.synthetic_check.runs", dash0_check_name="RoomPass public URL"}[5m]))
+                  seriesNameFormat: "{{dash0_synthetic_check_outcome}}"
+  layouts:
+    - kind: Grid
+      spec:
+        display:
+          title: Captions (what the phone sees)
+        items:
+          - {x: 0, y: 0, width: 12, height: 8, content: {$ref: "#/spec/panels/lateCaptions"}}
+          - {x: 12, y: 0, width: 12, height: 8, content: {$ref: "#/spec/panels/captionsDelivered"}}
+    - kind: Grid
+      spec:
+        display:
+          title: Caption pipeline
+        items:
+          - {x: 0, y: 0, width: 6, height: 8, content: {$ref: "#/spec/panels/pipelineLatency"}}
+          - {x: 6, y: 0, width: 6, height: 8, content: {$ref: "#/spec/panels/pipelineErrors"}}
+          - {x: 12, y: 0, width: 6, height: 8, content: {$ref: "#/spec/panels/chaosFlag"}}
+          - {x: 18, y: 0, width: 6, height: 8, content: {$ref: "#/spec/panels/questionsLatency"}}
+    - kind: Grid
+      spec:
+        display:
+          title: Services
+        items:
+          - {x: 0, y: 0, width: 6, height: 8, content: {$ref: "#/spec/panels/requests"}}
+          - {x: 6, y: 0, width: 6, height: 8, content: {$ref: "#/spec/panels/serverErrors"}}
+          - {x: 12, y: 0, width: 6, height: 8, content: {$ref: "#/spec/panels/serverLatency"}}
+          - {x: 18, y: 0, width: 6, height: 8, content: {$ref: "#/spec/panels/uptime"}}

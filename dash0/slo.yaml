@@ -1,0 +1,69 @@
+apiVersion: openslo.com/v1
+kind: SLO
+metadata:
+  name: roompass-uptime
+  labels:
+    dash0.com/origin: roompass-uptime
+  annotations:
+    dash0.com/display-name: RoomPass public URL uptime
+spec:
+  description: 99% of uptime checks against the public URL pass over a rolling 28 days.
+  service: backend
+  budgetingMethod: Occurrences
+  timeWindow:
+    - duration: 28d
+      isRolling: true
+  indicator:
+    metadata:
+      name: roompass-uptime-ratio
+    spec:
+      ratioMetric:
+        counter: true
+        good:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: '{otel_metric_name="dash0.synthetic_check.runs",dash0_check_name="RoomPass public URL",dash0_synthetic_check_outcome="Healthy"}'
+        total:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: '{otel_metric_name="dash0.synthetic_check.runs",dash0_check_name="RoomPass public URL"}'
+  objectives:
+    - displayName: 99% of checks pass
+      target: 0.99
+---
+apiVersion: openslo.com/v1
+kind: SLO
+metadata:
+  name: roompass-caption-lag
+  labels:
+    dash0.com/origin: roompass-caption-lag
+  annotations:
+    dash0.com/display-name: RoomPass captions on time
+spec:
+  description: 95% of captions are published within 10 s of their audio arriving, the same as p95 lag under 10 s.
+  service: backend
+  budgetingMethod: Occurrences
+  timeWindow:
+    - duration: 28d
+      isRolling: true
+  indicator:
+    metadata:
+      name: roompass-caption-on-time-ratio
+    spec:
+      ratioMetric:
+        counter: true
+        good:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: '{otel_metric_name="dash0.spans",otel_span_name="pipeline.publish",roompass_caption_late="false"}'
+        total:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: '{otel_metric_name="dash0.spans",otel_span_name="pipeline.publish",roompass_caption_late=~"true|false"}'
+  objectives:
+    - displayName: 95% of captions under 10 s
+      target: 0.95
