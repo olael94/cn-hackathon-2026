@@ -77,6 +77,9 @@
           },
           "voted": {
             "type": "boolean"
+          },
+          "translation": {
+            "type": ["string", "null"]
           }
         },
         "required": [
@@ -88,6 +91,11 @@
         ],
         "additionalProperties": false
       },
+      "default": []
+    },
+    "formulations_en": {
+      "type": "array",
+      "items": { "type": "string" },
       "default": []
     },
     "formulations": {

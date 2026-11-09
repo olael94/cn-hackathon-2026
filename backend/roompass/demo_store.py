@@ -23,6 +23,10 @@ def database() -> Iterator[sqlite3.Connection]:
                 PRIMARY KEY (room, device, request)
             )""")
         db.execute("""
+            CREATE TABLE IF NOT EXISTS question_languages (
+                text TEXT PRIMARY KEY, lang TEXT NOT NULL, english TEXT NOT NULL
+            )""")
+        db.execute("""
             CREATE TABLE IF NOT EXISTS replays (
                 room TEXT PRIMARY KEY, revision INTEGER NOT NULL,
                 started_ms INTEGER, stopped_ms INTEGER, owner TEXT

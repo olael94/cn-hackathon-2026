@@ -7,6 +7,7 @@ const detail = z.object({
   id: z.string(),
   text: z.string(),
   lang: z.enum(['es', 'en']),
+  translation: z.string().nullable(),
   votes: z.number().int(),
   voted: z.boolean(),
 })
@@ -17,6 +18,7 @@ const queue = z.array(
     segment: z.number().nullable(),
     expansions: z.array(detail),
     formulations: z.array(z.string()),
+    formulations_en: z.array(z.string()),
   }),
 ) satisfies z.ZodType<DemoGroup[]>
 const review = z.object({
@@ -58,13 +60,16 @@ async function request<T>(
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!response.ok) {
+    if (response.status === 503) {
+      throw new Error('Language detection or translation is unavailable. Your draft is here. Please try again.')
+    }
     throw new Error(
       response.status === 429
         ? 'You can post three questions per minute.'
         : 'Could not reach the shared queue. Please try again.',
     )
   }
-  return schema.parse(await response.json())
+  return { data: schema.parse(await response.json()), action: response.headers.get('X-Question-Action') }
 }
 
 export function useQuestions() {
@@ -72,21 +77,22 @@ export function useQuestions() {
   const key = ['demo-questions', room]
   const state = useQuery({
     queryKey: key,
-    queryFn: ({ signal }) => request('', queue, undefined, signal),
+    queryFn: async ({ signal }) => (await request('', queue, undefined, signal)).data,
     refetchInterval: 1000,
     retry: 1,
   })
   async function submit(contribution: DemoContribution) {
     const next = await request('', queue, contribution)
     await client.cancelQueries({ queryKey: key })
-    client.setQueryData(key, next)
+    client.setQueryData(key, next.data)
     void client.invalidateQueries({ queryKey: key })
+    return z.enum(['ask', 'expand', 'support']).parse(next.action)
   }
   return {
     questions: state.data ?? [],
     loading: state.isPending,
     failed: state.isError,
-    check: (text: string) => request('/check', review, { text } satisfies DemoCheck),
+    check: async (text: string) => (await request('/check', review, { text } satisfies DemoCheck)).data,
     submit,
   }
 }

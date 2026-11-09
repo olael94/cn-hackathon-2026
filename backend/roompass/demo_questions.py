@@ -6,7 +6,7 @@ import time
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Response
 
 from roompass.contract import DemoCheck as Check
 from roompass.contract import DemoContribution as Contribution
@@ -15,6 +15,7 @@ from roompass.contract import DemoReview as Review
 from roompass.contract import Expansion as Detail
 from roompass.demo_store import Room, database
 from roompass.qa_search import review_question
+from roompass.question_language import language_for
 
 router = APIRouter(prefix="/api/demo")
 Device = Annotated[UUID, Header(alias="X-Device-Id")]
@@ -40,9 +41,14 @@ def read_queue(db: sqlite3.Connection, room: str, device: str) -> list[Group]:
         )
         supporters[key] = {f"seed-{i}" for i in range(count)}
 
-    rows = db.execute("SELECT * FROM contributions WHERE room=? ORDER BY rowid", (room,))
+    rows = db.execute(
+        "SELECT c.*, COALESCE(l.lang,c.lang) AS detected, l.english FROM contributions c "
+        "LEFT JOIN question_languages l ON l.text=c.text WHERE c.room=? ORDER BY c.rowid",
+        (room,),
+    )
     for row in rows:
         author, action = row["device"], row["action"]
+        translation = row["english"] if row["detected"] == "es" else None
         key = f"{author}:{row['request']}"
         # Public identifiers must not expose the author's device credential.
         key = hashlib.sha256(key.encode()).hexdigest()[:32]
@@ -52,7 +58,8 @@ def read_queue(db: sqlite3.Connection, room: str, device: str) -> list[Group]:
             groups[key] = Group(
                 id=key,
                 text=row["text"],
-                lang=row["lang"],
+                lang=row["detected"],
+                translation=translation,
                 segment=row["segment"],
                 votes=0,
                 mine=False,
@@ -61,14 +68,23 @@ def read_queue(db: sqlite3.Connection, room: str, device: str) -> list[Group]:
             supporters[key] = set()
         elif action == "expand":
             parents[key] = root
-            detail = Detail(id=key, text=row["text"], lang=row["lang"], votes=0, voted=False)
+            detail = Detail(
+                id=key,
+                text=row["text"],
+                lang=row["detected"],
+                translation=translation,
+                votes=0,
+                voted=False,
+            )
             groups[root].expansions.append(detail)
             details[key] = detail
             supporters[key] = {author}
-        elif row["target"] in details:
-            supporters[row["target"]].add(author)
-        elif row["text"] and row["text"] not in groups[root].formulations:
-            groups[root].formulations.append(row["text"])
+        else:
+            if row["target"] in details:
+                supporters[row["target"]].add(author)
+            if row["text"] and row["text"] not in groups[root].formulations:
+                groups[root].formulations.append(row["text"])
+                groups[root].formulations_en.append(translation or row["text"])
         supporters[root].add(author)
         if groups[root].segment is None and row["text"] and row["segment"] is not None:
             groups[root].segment = row["segment"]
@@ -92,37 +108,50 @@ def questions(room: Room, device: Device) -> list[Group]:
 def check_question(room: Room, device: Device, body: Check) -> Review:
     with database() as db:
         queue = read_queue(db, room, str(device))
-    return review_question(body.text, queue)
+    return review_question(language_for(body.text).english, queue)
 
 
 @router.post("/{room}/questions")
-def contribute(room: Room, device: Device, body: Contribution) -> list[Group]:
+def contribute(room: Room, device: Device, body: Contribution, response: Response) -> list[Group]:
     author = str(device)
     if body.lang is None or body.segment not in (None, 41, 42):
         raise HTTPException(422, "Choose an available replay language and caption.")
+    identity = (room, author, str(body.request_id))
+    lookup = "SELECT action FROM contributions WHERE room=? AND device=? AND request=?"
+    with database() as db:
+        previous = db.execute(lookup, identity).fetchone()
+        if previous:
+            response.headers["X-Question-Action"] = previous["action"]
+            return read_queue(db, room, author)
+    wording = language_for(body.text) if body.text else None
     with database() as db:
         db.execute("BEGIN IMMEDIATE")
-        identity = (room, author, str(body.request_id))
-        if db.execute(
-            "SELECT 1 FROM contributions WHERE room=? AND device=? AND request=?", identity
-        ).fetchone():
+        previous = db.execute(lookup, identity).fetchone()
+        if previous:
+            response.headers["X-Question-Action"] = previous["action"]
             return read_queue(db, room, author)
         queue = read_queue(db, room, author)
         # Two phones can both finish classification before either one publishes.
         # Resolve identical new questions or sibling follow-ups inside the write lock.
         if body.text and body.action in ("ask", "expand"):
-            wording = " ".join(body.text.casefold().split())
+            normalized = " ".join(wording.english.casefold().split())
             for group in queue:
                 if body.action == "expand" and group.id != body.target:
                     continue
                 items = [group, *group.expansions] if body.action == "ask" else group.expansions
                 duplicate = next(
-                    (item for item in items if " ".join(item.text.casefold().split()) == wording),
+                    (
+                        item
+                        for item in items
+                        if " ".join((item.translation or item.text).casefold().split())
+                        == normalized
+                    ),
                     None,
                 )
                 if duplicate:
                     body = body.model_copy(update={"action": "support", "target": duplicate.id})
                     break
+        response.headers["X-Question-Action"] = body.action
         roots = {group.id for group in queue}
         targets = roots | {detail.id for group in queue for detail in group.expansions}
         if body.action == "ask" and body.target is not None:
@@ -147,8 +176,20 @@ def contribute(room: Room, device: Device, body: Contribution) -> list[Group]:
             ).fetchone()[0]
             if recent >= 3:
                 raise HTTPException(429, "You can post three questions per minute.")
+            db.execute(
+                "INSERT OR IGNORE INTO question_languages VALUES (?,?,?)",
+                (body.text, wording.lang, wording.english),
+            )
         db.execute(
             "INSERT INTO contributions VALUES (?,?,?,?,?,?,?,?,?)",
-            (*identity, body.action, body.target, body.text, body.lang, body.segment, time.time()),
+            (
+                *identity,
+                body.action,
+                body.target,
+                body.text,
+                wording.lang if wording else body.lang,
+                body.segment,
+                time.time(),
+            ),
         )
         return read_queue(db, room, author)

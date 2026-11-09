@@ -22,6 +22,7 @@ class Expansion(BaseModel):
     lang: Lang
     votes: conint(ge=0)
     voted: bool
+    translation: str | None = None
 
 
 class DemoGroup(BaseModel):
@@ -37,4 +38,5 @@ class DemoGroup(BaseModel):
     translation: str | None = None
     segment: int | None = None
     expansions: list[Expansion] | None = Field([], validate_default=True)
+    formulations_en: list[str] | None = []
     formulations: list[str] | None = []

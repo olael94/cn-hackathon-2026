@@ -25,6 +25,10 @@ Set `ROOMPASS_QA_DECISIONS=1` and `OPENAI_API_KEY` in the private backend enviro
 
 ## Submitting a question
 
+Type in English or Spanish. The server detects the language, keeps the original wording for attendees, and uses English for matching and for every section of the speaker brief. After publication the phone shows **Question received**, quotes the original draft, and explains how it counted. Tap **Done** to return to the queue.
+
+The translation model defaults to `gpt-4.1-mini` and can be set with `ROOMPASS_QA_TRANSLATION_MODEL`. To update a pre-existing demo database, run `uv run --env-file ../.env python -m roompass.question_language` from `backend/`. Each invocation translates up to 30 distinct older drafts in one request.
+
 Attendees type a question and press **Send question**. If a visible caption may answer it, the attendee can close the draft with **This answers it**, or continue with **Still ask**. Otherwise the service submits immediately. A receipt explains the result.
 
 | Relationship | Queue update |

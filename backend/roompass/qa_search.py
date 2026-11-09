@@ -93,9 +93,9 @@ def review_question(text: str, groups: list[Group]) -> Review:
             pass  # The seeded replay remains available offline.
     candidates = []
     for group in groups:
-        candidates.append((group.id, group.id, group.text))
+        candidates.append((group.id, group.id, group.translation or group.text))
         for detail in group.expansions:
-            candidates.append((detail.id, group.id, detail.text))
+            candidates.append((detail.id, group.id, detail.translation or detail.text))
     candidates.sort(key=lambda item: len(words & tokens(item[2])), reverse=True)
     exact = next(
         (item for item in candidates if item[2].casefold() == text.strip().casefold()), None

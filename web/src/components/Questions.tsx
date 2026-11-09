@@ -32,7 +32,7 @@ export function Questions({
   const [open, setOpen] = useState(false)
   const [mineOnly, setMineOnly] = useState(false)
   const [draft, setDraft] = useState('')
-  const [lang, setLang] = useState<'es' | 'en'>('en')
+  const [receipt, setReceipt] = useState('')
   const [review, setReview] = useState<Review | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -45,6 +45,7 @@ export function Questions({
     if (busy) return
     setOpen(next)
     setReview(null)
+    setReceipt('')
     setDraft('')
     setError('')
     attempt.current.signature = ''
@@ -89,11 +90,10 @@ export function Questions({
       action,
       target: parent,
       text,
-      lang,
       segment,
     }
     const signature = text
-      ? JSON.stringify([text, lang])
+      ? text
       : JSON.stringify(payload)
     if (attempt.current.signature !== signature)
       attempt.current = { signature, id: newId() }
@@ -103,22 +103,15 @@ export function Questions({
         group.expansions.some((detail) => detail.id === parent),
     )
     try {
-      await model.submit({ ...payload, request_id: attempt.current.id })
-      setOpen(false)
-      setDraft('')
-      setReview(null)
+      const recorded = await model.submit({ ...payload, request_id: attempt.current.id })
+      const message = {
+        ask: 'Your question was added to the speaker’s queue.',
+        support: text ? 'Your question counted as support for an existing question.' : 'Support recorded.',
+        expand: related ? `Your follow-up was added to “${related.text}”.` : 'Your follow-up was added.',
+      }[recorded]
+      if (text) setReceipt(message)
+      else setNotice(message)
       attempt.current.signature = ''
-      setNotice(
-        {
-          ask: 'Question posted',
-          support: text
-            ? 'Someone already asked this. Your support has been counted.'
-            : 'Support recorded',
-          expand: related
-            ? `Follow-up added to “${related.text}”`
-            : 'Follow-up added.',
-        }[action],
-      )
     } catch (cause) {
       console.error(cause)
       setError(cause instanceof Error ? cause.message : 'Please try again.')
@@ -166,14 +159,11 @@ export function Questions({
                 <p lang={speaker && group.translation ? 'en' : group.lang}>
                   {(speaker && group.translation) || group.text}
                 </p>
-                {speaker && group.translation && (
-                  <small lang={group.lang}>{group.text}</small>
-                )}
                 {speaker && (
                   <details className="qa-brief">
                     <summary>Speaker brief</summary>
                     <strong>Asked by the room</strong>
-                    <p lang={group.lang}>{group.text}</p>
+                    <p lang={group.translation ? 'en' : group.lang}>{group.translation || group.text}</p>
                     <strong>Already discussed</strong>
                     {evidence ? (
                       <blockquote lang="en">
@@ -183,14 +173,14 @@ export function Questions({
                       <p>No caption reference found.</p>
                     )}
                     <strong>What to clarify</strong>
-                    <p>{group.expansions[0]?.text ?? 'No follow-up yet.'}</p>
+                    <p>{group.expansions[0]?.translation ?? group.expansions[0]?.text ?? 'No follow-up yet.'}</p>
                     {group.formulations.length > 0 && (
                       <details>
                         <summary>
                           Other wordings ({group.formulations.length})
                         </summary>
-                        {group.formulations.map((text) => (
-                          <p key={text}>{text}</p>
+                        {group.formulations_en.map((text, i) => (
+                          <p key={group.formulations[i]}>{text}</p>
                         ))}
                       </details>
                     )}
@@ -202,7 +192,9 @@ export function Questions({
                       Follow-up · {detail.votes}{' '}
                       {detail.votes === 1 ? 'supporter' : 'supporters'}
                     </small>
-                    <p lang={detail.lang}>{detail.text}</p>
+                    <p lang={speaker && detail.translation ? 'en' : detail.lang}>
+                      {(speaker && detail.translation) || detail.text}
+                    </p>
                     {!speaker && (
                       <Button
                         variant="ghost"
@@ -262,7 +254,9 @@ export function Questions({
             <Dialog.Overlay className="qa-overlay" />
             <Dialog.Content className="qa-dialog">
               <div className="qa-dialog-heading">
-                <Dialog.Title>Ask a question</Dialog.Title>
+                <Dialog.Title>
+                  {receipt ? 'Question received' : citation ? 'Review matching caption' : 'Ask a question'}
+                </Dialog.Title>
                 <Dialog.Close asChild>
                   <button
                     className="qa-close"
@@ -273,10 +267,17 @@ export function Questions({
                   </button>
                 </Dialog.Close>
               </div>
-              <Dialog.Description className="qa-description">
-                If the talk already covered this, you’ll see the caption first.
+              <Dialog.Description className="qa-description" role={receipt ? 'status' : undefined}>
+                {receipt || (citation
+                  ? 'Read the caption below. Choose Still ask to send your question to the speaker.'
+                  : 'Ask in English or Spanish. If a caption covers your question, you’ll see it first.')}
               </Dialog.Description>
-              {!review || !citation ? (
+              {receipt ? (
+                <>
+                  <blockquote className="qa-draft">{draft.trim()}</blockquote>
+                  <Dialog.Close asChild><Button className="qa-ask" autoFocus>Done</Button></Dialog.Close>
+                </>
+              ) : !review || !citation ? (
                 <form
                   onSubmit={(e) => {
                     e.preventDefault()
@@ -300,20 +301,6 @@ export function Questions({
                   />
                   <details>
                     <summary className="qa-example">Question options</summary>
-                    <label className="qa-language">
-                      Language
-                      <select
-                        disabled={busy}
-                        value={lang}
-                        onChange={(e) => {
-                          setLang(e.target.value === 'es' ? 'es' : 'en')
-                          setReview(null)
-                        }}
-                      >
-                        <option value="en">English</option>
-                        <option value="es">Spanish</option>
-                      </select>
-                    </label>
                     <div className="qa-samples">
                       {samples.map((sample, i) => (
                         <button
@@ -324,7 +311,6 @@ export function Questions({
                           onClick={() => {
                             setReview(null)
                             setDraft(sample)
-                            setLang('en')
                           }}
                         >
                           {i ? 'Use sample follow-up' : 'Use sample question'}
@@ -342,7 +328,7 @@ export function Questions({
                 </form>
               ) : (
                 <>
-                  <p className="qa-draft" lang={lang}>
+                  <p className="qa-draft">
                     {draft}
                   </p>
                   <div className="qa-citation">

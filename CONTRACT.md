@@ -138,11 +138,13 @@ The demo speaker sends `POST /api/demo/{room}/replay/{start|stop|reset}?revision
 
 The two-phone rehearsal uses the isolated `/api/demo/{room}/questions` routes. The room is six lowercase letters or digits and every call sends the viewer's `X-Device-Id` UUID. These routes share a queue between the attendee replay and the read-only speaker brief. They do not grant speaker controls.
 
+For written contributions the server detects English or Spanish from the draft. Group and expansion `text` keep the original, `lang` carries the detected language, and `translation` carries the English rendering of Spanish. Groups also include `formulations_en` in the same order as `formulations`. If a draft needs language processing that is unavailable, check or submission can return 503 and the attendee can retry.
+
 | Method | Suffix after `/questions` | Request | Response |
 |---|---|---|---|
 | GET | empty | none | Ranked groups for this device |
 | POST | `/check` | `{text}` | `{target,segment,source,score,suggestion}`. Missing matches are null. The replay uses the seeded segment number. The optional score is an Elasticsearch keyword score, and `suggestion` gives the automatic route (`support`, `expand` or `ask`). A segment is returned when its citation may answer the specific draft. The phone submits the route automatically unless it shows the citation first. |
-| POST | empty | `{request_id,action,target?,text?,lang?,segment?}` | Updated ranked groups. Reuse the same request UUID for a retry. |
+| POST | empty | `{request_id,action,target?,text?,lang?,segment?}` | Updated ranked groups and the committed action in `X-Question-Action`. Reuse the same request UUID for a retry. |
 
 A group has `{id,text,lang,votes,voted,mine,translation,segment,expansions,formulations}`. Translation and segment can be null. Expansions have `{id,text,lang,votes,voted}`. Formulations are the original wordings submitted in support of a group. An `ask` creates a group, `expand` adds a detail to a group, and `support` backs a group or detail. The group total counts distinct participating devices, including authors. The list sorts by votes, with the older question first on a tie. Missing targets return 404, invalid combinations 422, and more than three written contributions per minute per device per room return 429. The demo polls the personalized snapshot once per second. The live talk API below has its own SSE and search contracts.
 

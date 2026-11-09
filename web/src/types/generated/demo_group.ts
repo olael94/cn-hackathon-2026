@@ -15,6 +15,7 @@ export interface DemoGroup {
   translation?: string | null;
   segment?: number | null;
   expansions?: DemoDetail[];
+  formulations_en?: string[];
   formulations?: string[];
 }
 export interface DemoDetail {
@@ -23,4 +24,5 @@ export interface DemoDetail {
   lang: "en" | "es";
   votes: number;
   voted: boolean;
+  translation?: string | null;
 }
