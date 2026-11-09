@@ -132,8 +132,8 @@ async def load_state(talk_id: str) -> TalkState:
     if stored:
         state.next_publish = stored[-1].seq + 1
         state.buffer.extend(stored[-BUFFER_SIZE:])
-    talks[talk_id] = state
-    return state
+    # Another request may have loaded the talk while we awaited Elasticsearch.
+    return talks.setdefault(talk_id, state)
 
 
 def require_speaker(state: TalkState, token: str | None) -> None:
@@ -222,6 +222,7 @@ async def translate(text: str, talk_id: str, seq: int) -> str | None:
                     response = await client.post(
                         f"{TRANSLATOR_URL}/api/translate",
                         json={"text": text, "source": "en", "target": "es"},
+                        headers={"X-Internal-Token": os.environ.get("TRANSLATOR_TOKEN", "")},
                     )
                     response.raise_for_status()
                     return TranslateResponse.model_validate(response.json()).text
@@ -374,6 +375,8 @@ async def upload_audio(
     if state.talk.status != "live":
         raise HTTPException(status_code=409, detail="Talk is not live")
     audio = await file.read()
+    if seq < state.next_publish:  # already published or skipped: discard (CONTRACT.md)
+        return AudioAccepted(seq=seq)
     state.arrived_at.setdefault(seq, time.monotonic())
     # Answer the speaker page right away; the work runs in the background.
     spawn(process_chunk(state, audio, file.filename or "chunk.webm", seq, t_start, t_end))
@@ -430,8 +433,13 @@ async def events(
 
 
 @router.post("/translate")
-async def translate_route(body: TranslateRequest) -> TranslateResponse:
+async def translate_route(
+    body: TranslateRequest, x_internal_token: Annotated[str | None, Header()] = None
+) -> TranslateResponse:
     """Used by the translator Deployment (TRANSLATOR_URL). Same code, own pod and scaling."""
+    expected = os.environ.get("TRANSLATOR_TOKEN", "")
+    if not expected or not x_internal_token or not hmac.compare_digest(x_internal_token, expected):
+        raise HTTPException(status_code=401, detail="Internal only")
     if body.source not in prompts.LANGUAGE_NAMES or body.target not in prompts.LANGUAGE_NAMES:
         raise HTTPException(status_code=422, detail="Only en and es are supported")
     return TranslateResponse(text=await translate_local(body.text, body.source, body.target))

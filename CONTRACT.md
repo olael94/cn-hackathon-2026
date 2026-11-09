@@ -148,9 +148,9 @@ The 4 or 5 themes that cover most of the questions, for the speaker to answer in
 | GET | `/api/talks/{talk_id}/catchup?lang=en` | none | | `CatchUp` |
 | GET | `/api/talks/{talk_id}/themes` | none | | `ThemeSet` (empty `themes` until there are 2 related questions) |
 | GET | `/api/health` | none | | `{status, version}` (already built) |
-| POST | `/api/translate` | internal | `{text, source, target}` (`en` or `es`) | `{text}`. Called by the backend on the `translator` Deployment (`TRANSLATOR_URL`). The web app never calls it |
+| POST | `/api/translate` | internal: `X-Internal-Token` must match `TRANSLATOR_TOKEN` | `{text, source, target}` (`en` or `es`) | `{text}`. Called by the backend on the `translator` Deployment (`TRANSLATOR_URL`). The web app never calls it |
 
-Status codes: `401` bad or missing speaker token, `404` unknown talk, `409` talk not live (audio or questions on a talk that isn't live), `429` more than 3 questions per minute from one device.
+Status codes: `401` bad or missing speaker token or internal token, `404` unknown talk, `409` talk not live (audio or questions on a talk that isn't live), `429` more than 3 questions per minute from one device.
 
 ### Audio chunks
 - Send whatever `MediaRecorder` produces (webm/opus). No resampling needed.
