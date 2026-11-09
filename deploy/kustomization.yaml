@@ -12,7 +12,7 @@ resources:
 images:
   - name: web
     newName: ghcr.io/olael94/cn-hackathon-2026
-    newTag: "web-257e5d7"
+    newTag: "web-80af840"
   - name: backend
     newName: ghcr.io/olael94/cn-hackathon-2026
-    newTag: backend-257e5d7
+    newTag: backend-80af840
