@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react'
+import { useContext, useId, useRef, useState } from 'react'
 import { ChevronUp, MessageSquare, Plus, X } from 'lucide-react'
 import { Dialog } from 'radix-ui'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import {
 } from '@/api/questions'
 import { captions } from '@/demoRoom'
 import { newId } from '@/api/demo'
+import { LanguageContext, useUiText } from '@/uiText'
 import './questions.css'
 
 type Segment = { id: number; time: string; en: string; es: string }
@@ -29,25 +30,28 @@ export function Questions({
   segments: readonly Segment[]
   liveVoice: boolean
 }) {
+  const t = useUiText()
+  const language = useContext(LanguageContext)
   const heading = useId()
   const input = useId()
   const [open, setOpen] = useState(false)
   const [mineOnly, setMineOnly] = useState(false)
   const [draft, setDraft] = useState('')
-  const [receipt, setReceipt] = useState('')
+  const [receipt, setReceipt] = useState<{message: string; question?: string} | null>(null)
   const [review, setReview] = useState<Review | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const attempt = useRef({ signature: '', id: '' })
   const citation = segments.find((line) => line.id === review?.segment)
+  const reviewingCaption = Boolean(citation || (liveVoice && review?.segment != null))
   const filtered = model.questions.filter((group) => !mineOnly || group.mine)
 
   function toggle(next: boolean) {
     if (busy) return
     setOpen(next)
     setReview(null)
-    setReceipt('')
+    setReceipt(null)
     setDraft('')
     setError('')
     attempt.current.signature = ''
@@ -60,7 +64,7 @@ export function Questions({
       const route = review ?? (await model.check(draft.trim()))
       setReview(route)
       const cited = segments.find((line) => line.id === route.segment)
-      if (!review && cited) return
+      if (!review && (cited || (liveVoice && route.segment != null))) return
       await publish(route)
     } catch (cause) {
       console.error(cause)
@@ -76,7 +80,7 @@ export function Questions({
       action,
       action === 'ask' ? undefined : (route.target ?? undefined),
       draft.trim(),
-      liveVoice ? undefined : route.segment ?? undefined,
+      liveVoice || segments.some(line => line.id === route.segment) ? route.segment ?? undefined : undefined,
     )
   }
 
@@ -109,9 +113,9 @@ export function Questions({
       const message = {
         ask: 'Your question was added to the speaker’s queue.',
         support: text ? 'Your question counted as support for an existing question.' : 'Support recorded.',
-        expand: related ? `Your follow-up was added to “${related.text}”.` : 'Your follow-up was added.',
+        expand: related ? 'Your follow-up was added to “{question}”.' : 'Your follow-up was added.',
       }[recorded]
-      if (text) setReceipt(message)
+      if (text) setReceipt({message, question: related?.text})
       else setNotice(message)
       attempt.current.signature = ''
     } catch (cause) {
@@ -126,35 +130,35 @@ export function Questions({
     <section className="qa-panel" aria-labelledby={heading}>
       <header className="qa-heading">
         <MessageSquare size={19} aria-hidden="true" />
-        <h2 id={heading}>Room Q&amp;A</h2>
+        <h2 id={heading}>{t('Room Q&A')}</h2>
         <span className="qa-count">{model.questions.length}</span>
       </header>
       <div className="qa-filters">
-        <span>Most supported first</span>
+        <span>{t('Most supported first')}</span>
         {!speaker && (
           <label className="qa-filter">
             <select
-              aria-label="Filter questions"
+              aria-label={t('Filter questions')}
               value={mineOnly ? 'mine' : 'all'}
               onChange={(e) => setMineOnly(e.target.value === 'mine')}
             >
-              <option value="all">All questions</option>
-              <option value="mine">My questions</option>
+              <option value="all">{t('All questions')}</option>
+              <option value="mine">{t('My questions')}</option>
             </select>
           </label>
         )}
       </div>
-      {model.loading && <p role="status">Loading the room’s questions…</p>}
+      {model.loading && <p role="status">{t('Loading the room’s questions…')}</p>}
       {model.failed && (
         <Alert>
           <AlertDescription>
-            Shared queue unavailable. Reconnecting…
+            {t('Shared queue unavailable. Reconnecting…')}
           </AlertDescription>
         </Alert>
       )}
       <ol className="qa-list">
         {filtered.map((group) => {
-          const evidence = !liveVoice && captions.find((line) => line.id === group.segment)
+          const evidence = (liveVoice ? segments : captions).find((line) => line.id === group.segment)
           return (
             <li key={group.id}>
               <div className="qa-copy">
@@ -163,26 +167,26 @@ export function Questions({
                 </p>
                 {speaker && (
                   <details className="qa-brief">
-                    <summary>Speaker brief</summary>
-                    <strong>Asked by the room</strong>
+                    <summary>{t('Speaker brief')}</summary>
+                    <strong>{t('Asked by the room')}</strong>
                     <p lang={group.translation ? 'en' : group.lang}>{group.translation || group.text}</p>
-                    <strong>Already discussed</strong>
+                    <strong>{t('Already discussed')}</strong>
                     {evidence ? (
                       <blockquote lang="en">
                         {evidence.en} <cite>· {evidence.time}</cite>
                       </blockquote>
                     ) : (
-                      <p>No caption reference found.</p>
+                      <p>{t('No caption reference found.')}</p>
                     )}
-                    <strong>What to clarify</strong>
-                    <p>{group.expansions[0]?.translation ?? group.expansions[0]?.text ?? 'No follow-up yet.'}</p>
+                    <strong>{t('What to clarify')}</strong>
+                    <p lang={group.expansions.length ? 'en' : language}>{group.expansions[0]?.translation ?? group.expansions[0]?.text ?? t('No follow-up yet.')}</p>
                     {group.formulations.length > 0 && (
                       <details>
                         <summary>
-                          Other wordings ({group.formulations.length})
+                          {t('Other wordings')} ({group.formulations.length})
                         </summary>
                         {group.formulations_en.map((text, i) => (
-                          <p key={group.formulations[i]}>{text}</p>
+                          <p lang="en" key={group.formulations[i]}>{text}</p>
                         ))}
                       </details>
                     )}
@@ -191,8 +195,8 @@ export function Questions({
                 {group.expansions.map((detail) => (
                   <div className="qa-followup" key={detail.id}>
                     <small>
-                      Follow-up · {detail.votes}{' '}
-                      {detail.votes === 1 ? 'supporter' : 'supporters'}
+                      {t('Follow-up')} · {detail.votes}{' '}
+                      {detail.votes === 1 ? t('supporter') : t('supporters')}
                     </small>
                     <p lang={speaker && detail.translation ? 'en' : detail.lang}>
                       {(speaker && detail.translation) || detail.text}
@@ -203,7 +207,7 @@ export function Questions({
                         disabled={busy || detail.voted}
                         onClick={() => void send('support', detail.id)}
                       >
-                        {detail.voted ? 'Supported' : 'Support follow-up'}
+                        {detail.voted ? t('Supported') : t('Support follow-up')}
                       </Button>
                     )}
                   </div>
@@ -212,7 +216,7 @@ export function Questions({
               {speaker ? (
                 <span
                   className="qa-vote"
-                  aria-label={group.votes + ' supporters'}
+                  aria-label={group.votes + ' ' + t(group.votes === 1 ? 'supporter' : 'supporters')}
                 >
                   <ChevronUp size={15} />
                   {group.votes}
@@ -220,7 +224,7 @@ export function Questions({
               ) : (
                 <button
                   className="qa-vote"
-                  aria-label={'Support ' + group.text}
+                  aria-label={t('Support {question}', {question: group.text})}
                   aria-pressed={group.voted}
                   disabled={busy || group.voted}
                   onClick={() => void send('support', group.id)}
@@ -234,14 +238,14 @@ export function Questions({
         })}
       </ol>
       {mineOnly && !filtered.length && (
-        <p className="qa-empty">Your contributions will appear here.</p>
+        <p className="qa-empty">{t('Your contributions will appear here.')}</p>
       )}
       <div className="qa-notice" role="status">
-        {notice}
+        {t(notice)}
       </div>
       {error && !open && (
         <Alert>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{t(error)}</AlertDescription>
         </Alert>
       )}
       {!speaker && (
@@ -249,7 +253,7 @@ export function Questions({
           <Dialog.Trigger asChild>
             <Button className="qa-ask">
               <Plus />
-              Ask a question
+              {t('Ask a question')}
             </Button>
           </Dialog.Trigger>
           <Dialog.Portal>
@@ -257,29 +261,29 @@ export function Questions({
             <Dialog.Content className="qa-dialog">
               <div className="qa-dialog-heading">
                 <Dialog.Title>
-                  {receipt ? 'Question received' : citation ? 'Review matching caption' : 'Ask a question'}
+                  {receipt ? t('Question received') : reviewingCaption ? t('Review matching caption') : t('Ask a question')}
                 </Dialog.Title>
                 <Dialog.Close asChild>
                   <button
                     className="qa-close"
                     disabled={busy}
-                    aria-label="Close question"
+                    aria-label={t('Close question')}
                   >
                     <X />
                   </button>
                 </Dialog.Close>
               </div>
               <Dialog.Description className="qa-description" role={receipt ? 'status' : undefined}>
-                {receipt || (citation
-                  ? 'Read the caption below. Choose Still ask to send your question to the speaker.'
-                  : 'Ask in English or Spanish. If a caption covers your question, you’ll see it first.')}
+                {receipt ? t(receipt.message, {question: receipt.question ?? ''}) : (reviewingCaption
+                  ? t('Read the caption below. Choose Still ask to send your question to the speaker.')
+                  : t('Ask in English or Spanish. If a caption covers your question, you’ll see it first.'))}
               </Dialog.Description>
               {receipt ? (
                 <>
                   <blockquote className="qa-draft">{draft.trim()}</blockquote>
-                  <Dialog.Close asChild><Button className="qa-ask" autoFocus>Done</Button></Dialog.Close>
+                  <Dialog.Close asChild><Button className="qa-ask" autoFocus>{t('Done')}</Button></Dialog.Close>
                 </>
-              ) : !review || !citation ? (
+              ) : !review || !reviewingCaption ? (
                 <form
                   onSubmit={(e) => {
                     e.preventDefault()
@@ -287,7 +291,7 @@ export function Questions({
                   }}
                 >
                   <div className="qa-language">
-                    <label htmlFor={input}>Your question</label>
+                    <label htmlFor={input}>{t('Your question')}</label>
                   </div>
                   <textarea
                     id={input}
@@ -302,7 +306,7 @@ export function Questions({
                     }}
                   />
                   <details>
-                    <summary className="qa-example">Question options</summary>
+                    <summary className="qa-example">{t('Question options')}</summary>
                     <div className="qa-samples">
                       {samples.map((sample, i) => (
                         <button
@@ -312,10 +316,10 @@ export function Questions({
                           key={sample}
                           onClick={() => {
                             setReview(null)
-                            setDraft(sample)
+                            setDraft(t(sample))
                           }}
                         >
-                          {i ? 'Use sample follow-up' : 'Use sample question'}
+                          {i ? t('Use sample follow-up') : t('Use sample question')}
                         </button>
                       ))}
                     </div>
@@ -325,7 +329,7 @@ export function Questions({
                     type="submit"
                     disabled={busy || !draft.trim()}
                   >
-                    {busy ? 'Sending…' : 'Send question'}
+                    {busy ? t('Sending…') : t('Send question')}
                   </Button>
                 </form>
               ) : (
@@ -333,33 +337,38 @@ export function Questions({
                   <p className="qa-draft">
                     {draft}
                   </p>
-                  <div className="qa-citation">
-                    <strong>Possibly covered at {citation.time}</strong>
-                    <blockquote lang="en">{citation.en}</blockquote>
-                  </div>
+                  {citation ? (
+                    <div className="qa-citation">
+                      <strong>{t('Possibly covered at {time}', {time: citation.time})}</strong>
+                      <blockquote lang={language}>{citation[language]}</blockquote>
+                      {review.score != null && (
+                        <small>{t('Semantic match score')} · {review.score.toLocaleString(language, { maximumFractionDigits: 3 })}</small>
+                      )}
+                    </div>
+                  ) : <p role="status">{t('Waiting for the matching caption…')}</p>}
                   <div className="qa-actions">
                     <Button
-                      disabled={busy}
+                      disabled={busy || !citation}
                       onClick={() => {
                         toggle(false)
                         setNotice('Question resolved by the caption.')
                       }}
                     >
-                      This answers it
+                      {t('This answers it')}
                     </Button>
                     <Button
                       variant="outline"
                       disabled={busy}
                       onClick={() => void submitDraft()}
                     >
-                      {busy ? 'Sending…' : 'Still ask'}
+                      {busy ? t('Sending…') : t('Still ask')}
                     </Button>
                   </div>
                 </>
               )}
               {error && (
                 <Alert>
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription>{t(error)}</AlertDescription>
                 </Alert>
               )}
             </Dialog.Content>

@@ -1,0 +1,51 @@
+[
+  {
+    "id": 40,
+    "time": "12:00",
+    "en": "Every room should have captions that everyone can follow.",
+    "es": "Todas las salas deberían tener subtítulos que todos puedan seguir.",
+    "lag": 1.2
+  },
+  {
+    "id": 41,
+    "time": "12:04",
+    "en": "When a phone reconnects, it picks up the captions it missed.",
+    "es": "Cuando un teléfono se reconecta, recupera los subtítulos que se perdió.",
+    "lag": 1.6
+  },
+  {
+    "id": 42,
+    "time": "12:09",
+    "en": "We measure delay from the moment a speaker finishes a line to the moment it reaches your phone.",
+    "es": "Medimos el retraso desde que el ponente termina una frase hasta que aparece en tu teléfono.",
+    "lag": 5.2
+  },
+  {
+    "id": 43,
+    "time": "12:17",
+    "en": "A slower translation changes that number, even when the audio arrives on time.",
+    "es": "Una traducción más lenta cambia ese número, aunque el audio llegue a tiempo.",
+    "lag": 8.1
+  },
+  {
+    "id": 44,
+    "time": "12:25",
+    "en": "The threshold is ten seconds. This caption arrived outside that window.",
+    "es": "El umbral es de diez segundos. Este subtítulo llegó fuera de ese margen.",
+    "lag": 12.4
+  },
+  {
+    "id": 45,
+    "time": "12:33",
+    "en": "Switching translators brings the delay back down. The earlier captions stay on screen.",
+    "es": "Cambiar de traductor reduce el retraso. Los subtítulos anteriores siguen en pantalla.",
+    "lag": 1.3
+  },
+  {
+    "id": 46,
+    "time": "12:41",
+    "en": "You can ask a question in either language and vote on what the room asks next.",
+    "es": "Puedes hacer una pregunta en cualquiera de los dos idiomas y votar qué se pregunta después.",
+    "lag": 1.5
+  }
+]

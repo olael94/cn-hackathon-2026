@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict
 class Source(StrEnum):
     replay = 'replay'
     elasticsearch = 'elasticsearch'
+    unavailable = 'unavailable'
 
 
 class Suggestion(StrEnum):

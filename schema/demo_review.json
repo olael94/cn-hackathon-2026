@@ -27,7 +27,8 @@
       "type": "string",
       "enum": [
         "replay",
-        "elasticsearch"
+        "elasticsearch",
+        "unavailable"
       ],
       "default": "replay"
     },

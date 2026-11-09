@@ -14,14 +14,20 @@ from roompass.contract import DemoGroup as Group
 from roompass.contract import DemoReview as Review
 from roompass.contract import Expansion as Detail
 from roompass.demo_store import Room, database
-from roompass.qa_search import review_question
+from roompass.qa_search import REPLAY_TALK, review_question
 from roompass.question_language import language_for
 
 router = APIRouter(prefix="/api/demo")
 Device = Annotated[UUID, Header(alias="X-Device-Id")]
 
 
+def caption_talk(db: sqlite3.Connection, room: str) -> str:
+    row = db.execute("SELECT talk_id FROM room_voice WHERE room=?", (room,)).fetchone()
+    return row["talk_id"] if row else REPLAY_TALK
+
+
 def read_queue(db: sqlite3.Connection, room: str, device: str) -> list[Group]:
+    talk = caption_talk(db, room)
     groups: dict[str, Group] = {}
     details: dict[str, Detail] = {}
     parents: dict[str, str] = {}
@@ -34,7 +40,7 @@ def read_queue(db: sqlite3.Connection, room: str, device: str) -> list[Group]:
             id=key,
             text=question,
             lang="en",
-            segment=segment,
+            segment=segment if talk == REPLAY_TALK else None,
             votes=count,
             mine=False,
             voted=False,
@@ -42,13 +48,15 @@ def read_queue(db: sqlite3.Connection, room: str, device: str) -> list[Group]:
         supporters[key] = {f"seed-{i}" for i in range(count)}
 
     rows = db.execute(
-        "SELECT c.*, COALESCE(l.lang,c.lang) AS detected, l.english FROM contributions c "
+        "SELECT c.*, COALESCE(l.lang,c.lang) AS detected, l.english, ref.talk FROM contributions c "
+        "LEFT JOIN contribution_captions ref USING (room,device,request) "
         "LEFT JOIN question_languages l ON l.text=c.text WHERE c.room=? ORDER BY c.rowid",
         (room,),
     )
     for row in rows:
         author, action = row["device"], row["action"]
         translation = row["english"] if row["detected"] == "es" else None
+        citation = row["segment"] if (row["talk"] or REPLAY_TALK) == talk else None
         key = f"{author}:{row['request']}"
         # Public identifiers must not expose the author's device credential.
         key = hashlib.sha256(key.encode()).hexdigest()[:32]
@@ -60,7 +68,7 @@ def read_queue(db: sqlite3.Connection, room: str, device: str) -> list[Group]:
                 text=row["text"],
                 lang=row["detected"],
                 translation=translation,
-                segment=row["segment"],
+                segment=citation,
                 votes=0,
                 mine=False,
                 voted=False,
@@ -86,8 +94,8 @@ def read_queue(db: sqlite3.Connection, room: str, device: str) -> list[Group]:
                 groups[root].formulations.append(row["text"])
                 groups[root].formulations_en.append(translation or row["text"])
         supporters[root].add(author)
-        if groups[root].segment is None and row["text"] and row["segment"] is not None:
-            groups[root].segment = row["segment"]
+        if groups[root].segment is None and row["text"] and citation is not None:
+            groups[root].segment = citation
         if author == device and (action != "support" or row["text"]):
             groups[root].mine = True
     for item in [*groups.values(), *details.values()]:
@@ -105,17 +113,33 @@ def questions(room: Room, device: Device) -> list[Group]:
 
 
 @router.post("/{room}/questions/check")
-def check_question(room: Room, device: Device, body: Check) -> Review:
+async def check_question(room: Room, device: Device, body: Check) -> Review:
     with database() as db:
+        talk = caption_talk(db, room)
         queue = read_queue(db, room, str(device))
-    return review_question(language_for(body.text).english, queue)
+    review = await review_question(body.text, queue, talk)
+    with database() as db:
+        db.execute(
+            "DELETE FROM checked_captions WHERE room=? AND talk=? AND device=? AND text=?",
+            (room, talk, str(device), hashlib.sha256(body.text.encode()).hexdigest()),
+        )
+        if review.segment is not None:
+            db.execute(
+                "INSERT INTO checked_captions VALUES (?,?,?,?,?)",
+                (
+                    room,
+                    talk,
+                    str(device),
+                    hashlib.sha256(body.text.encode()).hexdigest(),
+                    review.segment,
+                ),
+            )
+    return review
 
 
 @router.post("/{room}/questions")
 def contribute(room: Room, device: Device, body: Contribution, response: Response) -> list[Group]:
     author = str(device)
-    if body.lang is None or body.segment not in (None, 41, 42):
-        raise HTTPException(422, "Choose an available replay language and caption.")
     identity = (room, author, str(body.request_id))
     lookup = "SELECT action FROM contributions WHERE room=? AND device=? AND request=?"
     with database() as db:
@@ -152,6 +176,22 @@ def contribute(room: Room, device: Device, body: Contribution, response: Respons
                     body = body.model_copy(update={"action": "support", "target": duplicate.id})
                     break
         response.headers["X-Question-Action"] = body.action
+        if body.segment is not None:
+            talk = caption_talk(db, room)
+            checked = db.execute(
+                "SELECT 1 FROM checked_captions WHERE room=? AND talk=? "
+                "AND device=? AND text=? AND seq=?",
+                (
+                    room,
+                    talk,
+                    author,
+                    hashlib.sha256((body.text or "").encode()).hexdigest(),
+                    body.segment,
+                ),
+            ).fetchone()
+            if not checked:
+                raise HTTPException(409, "The cited caption changed. Check your question again.")
+            db.execute("INSERT INTO contribution_captions VALUES (?,?,?,?)", (*identity, talk))
         roots = {group.id for group in queue}
         targets = roots | {detail.id for group in queue for detail in group.expansions}
         if body.action == "ask" and body.target is not None:

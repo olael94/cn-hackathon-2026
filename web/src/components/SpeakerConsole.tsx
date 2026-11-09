@@ -4,6 +4,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { recordVoice, voiceFormat } from '@/api/voice'
 
+import { useUiText } from '@/uiText'
+
 type SpeakerProps = {
   phase: 'waiting' | 'live' | 'draining' | 'ended'
   ready: boolean
@@ -15,6 +17,7 @@ type SpeakerProps = {
 }
 
 function HoldToStop({ onConfirm, disabled }: { onConfirm: () => void; disabled: boolean }) {
+  const t = useUiText()
   const input = useRef<string | number | null>(null)
   const timer = useRef<number | undefined>(undefined)
   const [elapsed, setElapsed] = useState(0)
@@ -56,7 +59,7 @@ function HoldToStop({ onConfirm, disabled }: { onConfirm: () => void; disabled: 
     <div className="grid gap-2">
       <button
         type="button"
-        aria-label="Hold to end talk"
+        aria-label={t('Hold to end talk')}
         disabled={disabled}
         aria-describedby="hold-help"
         className="relative flex min-h-14 touch-none select-none items-center justify-center gap-2 overflow-hidden rounded-lg border-2 border-destructive bg-background px-4 font-mono text-sm font-bold text-foreground tabular-nums"
@@ -85,12 +88,12 @@ function HoldToStop({ onConfirm, disabled }: { onConfirm: () => void; disabled: 
         <Square aria-hidden="true" size={16} className="relative" />
         <span className="relative">
           {elapsed
-            ? `Ending in ${((3000 - elapsed) / 1000).toFixed(1)} s`
-            : 'Hold 3.0 s to end talk'}
+            ? t('Ending in {seconds} s', {seconds: ((3000 - elapsed) / 1000).toFixed(1)})
+            : t('Hold 3.0 s to end talk')}
         </span>
       </button>
       <p id="hold-help" className="text-sm text-muted-foreground">
-        Hold with touch, Space or Enter. Release early to cancel.
+        {t('Hold with touch, Space or Enter. Release early to cancel.')}
       </p>
     </div>
   )
@@ -117,6 +120,7 @@ export default function SpeakerConsole({
   onStop,
   onReset,
 }: SpeakerProps) {
+  const t = useUiText()
   const [save, setSave] = useState(false)
   const [source, setSource] = useState<'voice' | 'tab' | 'sample'>('voice')
   const tabAudio = source === 'tab' && (phase === 'waiting' || Boolean(voiceId))
@@ -258,16 +262,16 @@ export default function SpeakerConsole({
 
   const canConnect = phase === 'waiting' || (phase === 'live' && !sourceActive)
   const startLabel = error
-    ? (tabAudio ? 'Share tab again' : 'Try microphone again')
+    ? (tabAudio ? t('Share tab again') : t('Try microphone again'))
     : phase === 'live'
-      ? (tabAudio ? 'Share video tab' : 'Connect microphone')
-      : 'Start talk'
+      ? (tabAudio ? t('Share video tab') : t('Connect microphone'))
+      : t('Start talk')
 
   return (
-    <section className="panel" aria-label="Speaker controls">
+    <section className="panel" aria-label={t('Speaker controls')}>
       <div className="panel-heading">
         <Radio aria-hidden="true" size={20} />
-        <h2>Broadcast controls</h2>
+        <h2>{t('Broadcast controls')}</h2>
       </div>
       <div className="grid gap-5 p-5 sm:p-6">
         <div role="status" className="flex items-center gap-3 font-bold">
@@ -276,37 +280,37 @@ export default function SpeakerConsole({
           ) : (
             <MicOff aria-hidden="true" />
           )}
-          {phase === 'waiting' && 'Ready to start'}
+          {phase === 'waiting' && t('Ready to start')}
           {phase === 'live' &&
-            (sourceActive ? (tabAudio ? 'Capturing tab audio' : voiceId ? 'Capturing your voice' : 'Microphone active') : 'Audio source disconnected')}
-          {phase === 'draining' && 'Finishing captions (5 s)'}
-          {phase === 'ended' && 'Talk ended'}
+            (sourceActive ? (tabAudio ? t('Capturing tab audio') : voiceId ? t('Capturing your voice') : t('Microphone active')) : t('Audio source disconnected'))}
+          {phase === 'draining' && t('Finishing captions (5 s)')}
+          {phase === 'ended' && t('Talk ended')}
         </div>
         {(phase === 'waiting' || phase === 'live') && (
           <p className="text-sm text-muted-foreground">
-            {tabAudio ? 'Select the video tab and enable Share tab audio. Play the video once capture starts.'
+            {tabAudio ? t('Select the video tab and enable Share tab audio. Play the video once capture starts.')
               : (phase === 'waiting' ? voice : voiceId)
-              ? 'Speak in English. Your voice is sent for transcription and Spanish translation.'
-              : 'Replay the sample captions for this room.'}
+              ? t('Speak in English. Your voice is sent for transcription and Spanish translation.')
+              : t('Replay the sample captions for this room.')}
           </p>
         )}
         {(phase === 'waiting' || (voiceId && !sourceActive && phase === 'live')) && (
-          <label>Caption source{' '}
+          <label>{t('Caption source')}{' '}
             <select className="control" disabled={pending} value={source}
               onChange={e => {
                 const selected = e.target.value
                 setSource(selected === 'tab' || selected === 'sample' ? selected : 'voice')
                 setError('')
               }}>
-              <option value="voice">Live microphone</option>
-              <option value="tab">Browser tab audio</option>
-              {phase === 'waiting' && <option value="sample">Sample replay</option>}
+              <option value="voice">{t('Live microphone')}</option>
+              <option value="tab">{t('Browser tab audio')}</option>
+              {phase === 'waiting' && <option value="sample">{t('Sample replay')}</option>}
             </select>
           </label>
         )}
         {phase === 'waiting' && (
           <label className="flex min-h-12 cursor-pointer items-center justify-between gap-4 border-y border-border py-3">
-            Save the transcript on this device
+            {t('Save the transcript on this device')}
             <input
               type="checkbox"
               className="size-5 shrink-0 accent-primary"
@@ -318,7 +322,7 @@ export default function SpeakerConsole({
         )}
         {(error || controlError) && (
           <Alert>
-            <AlertDescription>{error || controlError}</AlertDescription>
+            <AlertDescription>{t(error || controlError || 'Please try again.')}</AlertDescription>
           </Alert>
         )}
         {canConnect && (
@@ -328,7 +332,7 @@ export default function SpeakerConsole({
             onClick={connectSource}
           >
             <Mic aria-hidden="true" />
-            {pending ? (tabAudio ? 'Connecting tab audio…' : 'Waiting for microphone…') : startLabel}
+            {pending ? (tabAudio ? t('Connecting tab audio…') : t('Waiting for microphone…')) : startLabel}
           </Button>
         )}
         {phase === 'live' && <HoldToStop onConfirm={() => void finishTalk()} disabled={!ready || pending} />}
@@ -339,7 +343,7 @@ export default function SpeakerConsole({
             onClick={onReset}
             disabled={!ready}
           >
-            Prepare another talk
+            {t('Prepare another talk')}
           </Button>
         )}
       </div>

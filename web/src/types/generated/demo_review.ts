@@ -8,7 +8,7 @@
 export interface DemoReview {
   target?: string | null;
   segment?: number | null;
-  source?: "replay" | "elasticsearch";
+  source?: "replay" | "elasticsearch" | "unavailable";
   score?: number | null;
   suggestion?: ("support" | "expand" | "ask") | null;
 }

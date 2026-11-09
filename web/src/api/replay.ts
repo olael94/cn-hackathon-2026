@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
 import type { DemoReplay } from '@/api/contract'
 import { demoPath, demoRoom, newId } from '@/api/demo'
+import { liveSpeaker, saveSpeaker, startLiveTalk, stopLiveTalk } from '@/api/liveTalk'
 
 const schema = z.object({
   revision: z.number().int(),
@@ -51,11 +52,30 @@ export function useReplay() {
   })
   const control = useMutation({
     networkMode: 'always',
-    mutationFn: (action: Action) => request('/' + (action === 'voice' ? 'start' : action)
-      + '?revision=' + state.data?.revision + (action === 'voice' ? '&voice=true' : ''), {
-      method: 'POST',
-      headers: { 'X-Speaker-Token': speakerToken() },
-    }),
+    mutationFn: async (action: Action) => {
+      const headers: Record<string, string> = { 'X-Speaker-Token': speakerToken() }
+      const revision = '?revision=' + state.data?.revision
+      if (action === 'voice') {
+        const session = await startLiveTalk()
+        headers['X-Live-Speaker-Token'] = session.token
+        try {
+          const next = await request('/start' + revision + '&talk_id=' + session.id, {method: 'POST', headers})
+          saveSpeaker(session)
+          return next
+        } catch (error) {
+          const room = await request('', {}).catch(() => undefined)
+          if (room?.voice_id === session.id) { saveSpeaker(session); return room }
+          await stopLiveTalk(session)
+          throw error
+        }
+      }
+      const session = state.data?.voice_id ? liveSpeaker(state.data.voice_id) : undefined
+      if (action === 'stop' && session) {
+        await stopLiveTalk(session)
+        headers['X-Live-Speaker-Token'] = session.token
+      }
+      return request('/' + action + revision, {method: 'POST', headers})
+    },
     onSuccess: async (next) => {
       await client.cancelQueries({ queryKey: key })
       client.setQueryData<typeof next>(key, (old) => old && old.revision > next.revision ? old : next)

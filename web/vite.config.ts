@@ -12,6 +12,9 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      ...(process.env.ROOMPASS_DEV_LIVE_BACKEND ? {
+        '/api/talks': { target: process.env.ROOMPASS_DEV_LIVE_BACKEND, changeOrigin: true },
+      } : {}),
       '/api': process.env.ROOMPASS_DEV_BACKEND ?? 'http://localhost:8000',
     },
   },

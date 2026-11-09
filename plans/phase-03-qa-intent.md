@@ -21,13 +21,15 @@ After the rehearsal, try “How much mobile data does recovery use?” by sendin
 
 In `backend/`, run `uv run --env-file ../.env uvicorn roompass.api:app --host 127.0.0.1 --port 8000`. In `web/`, run `pnpm build`, then `pnpm preview --host 0.0.0.0`. Open the Network address printed by Vite on both phones. The speaker can open the brief before starting the microphone.
 
-A single backend replica stores contributions in SQLite. Set `ROOMPASS_DEMO_DB` to choose the database file. With `ES_URL` and `ES_API_KEY` set, run `uv run --env-file ../.env python -m roompass.qa_search` from `backend/` to seed the two replay passages in the dedicated `roompass-demo-qa-v1` index. Elasticsearch runs a keyword search over the passages. The replay can also show a seeded citation when the service is unavailable.
+A single backend replica stores room contributions in SQLite. Set `ROOMPASS_DEMO_DB` to choose the database file. With `ES_URL` and `ES_API_KEY` set, run `uv run --env-file ../.env python -m roompass.qa_search` from `backend/` to index the seven sample captions in `segments` under talk ID `rpdemo`. Live talks index their own captions as they arrive. The phone checks the original draft against the current talk using Elasticsearch keyword and semantic retrieval. It shows the matching caption and score when the search marks it as possibly covered and the caption has reached the phone.
 
-Set `ROOMPASS_QA_DECISIONS=1` and `OPENAI_API_KEY` in the private backend environment for AI routing. The server checks up to eight room questions or follow-ups against the draft, including candidates with different wording. It asks whether a retrieved caption answers the specific detail. It caches repeated decisions and allows up to 30 external calls per run. [OpenAI Decisions API](https://developers.openai.com/api/docs/guides/decisions)
+To test against the deployed voice API, set `ROOMPASS_DEV_LIVE_BACKEND=https://the-mok-team.cnh.radarhq.io` when running Vite. The proxy sends `/api/talks` requests to the deployed backend and room requests to the local API. Configure the local API with access to the same Elasticsearch deployment so it can verify the talk and retrieve its captions.
+
+Set `ROOMPASS_QA_DECISIONS=1` and `OPENAI_API_KEY` in the private backend environment for AI routing. The model compares the draft to up to eight room questions or follow-ups and suggests whether to count support, attach a follow-up or add a new question. The server caches repeated routing decisions and allows up to 30 routing calls per run. [OpenAI Decisions API](https://developers.openai.com/api/docs/guides/decisions)
 
 ## Submitting a question
 
-Type in English or Spanish. The server detects the language, keeps the original wording for attendees, and uses English for matching and for every section of the speaker brief. After publication the phone shows **Question received**, quotes the original draft, and explains how it counted. Tap **Done** to return to the queue.
+Type in English or Spanish. The server detects the language, keeps the original wording for attendees, and uses English for grouping and for the speaker brief. Switching the EN/ES control changes the interface and captions on that device. After publication the phone shows **Question received**, quotes the original draft, and explains how it counted. Tap **Done** to return to the queue.
 
 The translation model defaults to `gpt-4.1-mini` and can be set with `ROOMPASS_QA_TRANSLATION_MODEL`. To update a pre-existing demo database, run `uv run --env-file ../.env python -m roompass.question_language` from `backend/`. Each invocation translates up to 30 distinct older drafts in one request.
 
@@ -55,7 +57,7 @@ The brief uses the original question, the cited caption, and the most supported 
 
 ## Next steps for live talks
 
-- Connect retrieval to the live talk's passages and questions. Calibrate thresholds on paraphrases, requests for an extra detail, and questions that share only a topic.
+- Evaluate coverage thresholds on more paraphrases, requests for an extra detail, and questions that share only a topic.
 - Index presenter materials shared with the audience and cite the page or slide. Refresh evidence when a later caption addresses a queued question.
 - Keep outstanding follow-ups visible after the speaker answers the main question and rank the group by the remaining demand.
 - Evaluate cross-language grouping and a generated brief that cites only verified source passages. Fall back to the template when citations are missing. See the [project brief](../brief/brief.md) and [AI rules](../.claude/rules/ai.md).

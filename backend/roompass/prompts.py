@@ -7,16 +7,6 @@ ROUTING_INSTRUCTIONS = (
     "question. Pick ask for independent questions or weak relationships. "
     "When supporting a follow-up, select the most specific match."
 )
-COVERAGE_QUESTION = {
-    "type": "choice",
-    "name": "coverage",
-    "instructions": "Does the cited caption actually answer the specific draft, including its "
-    "conditions and limits? A related topic alone is insufficient.",
-    "choices": [
-        {"value": "answered", "description": "The caption addresses the specific question."},
-        {"value": "open", "description": "The answer is missing, partial, or uncertain."},
-    ],
-}
 QUESTION_TRANSLATION = (
     "Detect the language of each audience question in this English/Spanish talk. "
     "Use es for Spanish, including informal or unaccented Spanish, and en for English. "

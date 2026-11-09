@@ -24,7 +24,7 @@ const queue = z.array(
 const review = z.object({
   target: z.string().nullable(),
   segment: z.number().nullable(),
-  source: z.enum(['elasticsearch', 'replay']),
+  source: z.enum(['elasticsearch', 'replay', 'unavailable']),
   score: z.number().nullable(),
   suggestion: z.enum(['support', 'expand', 'ask']).nullable(),
 }) satisfies z.ZodType<DemoReview>

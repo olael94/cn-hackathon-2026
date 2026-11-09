@@ -1,5 +1,6 @@
-"""Retrieve passages from the seeded replay, then optionally suggest a relation."""
+"""Search captions in one talk and independently route the audience question."""
 
+import asyncio
 import json
 import os
 import re
@@ -13,29 +14,13 @@ from pydantic import BaseModel
 
 from roompass.contract import DemoGroup as Group
 from roompass.contract import DemoReview as Review
-from roompass.prompts import COVERAGE_QUESTION, ROUTING_INSTRUCTIONS
+from roompass.prompts import ROUTING_INSTRUCTIONS
+from roompass.question_language import language_for
 
-INDEX = "roompass-demo-qa-v1"
+REPLAY_TALK = "rpdemo"
 # Limit uncached paid requests for one demo server run.
 _decision_budget = 30
 _decision_lock = Lock()
-PASSAGES = {
-    "recovery": {
-        "segment": 41,
-        "en": "When a phone reconnects, it picks up the captions it missed.",
-        "es": "Cuando un teléfono se reconecta, recupera los subtítulos que se perdió.",
-        "terms": "reconexión conexión reconectar desconexión connection reconnect "
-        "recuperar historial recovery",
-    },
-    "latency": {
-        "segment": 42,
-        "en": "We measure delay from the moment a speaker finishes a line "
-        "to the moment it reaches your phone.",
-        "es": "Medimos el retraso desde que el ponente termina una frase "
-        "hasta que aparece en tu teléfono.",
-        "terms": "latencia retraso delay latency",
-    },
-}
 
 
 def tokens(text: str) -> set[str]:
@@ -44,53 +29,30 @@ def tokens(text: str) -> set[str]:
     return set(re.findall(r"[a-z0-9]{4,}", plain)) - stop
 
 
-def elastic(method: str, path: str, body: dict | None = None, *, timeout: int = 3) -> dict:
-    url = os.environ["ES_URL"].rstrip("/") + "/" + INDEX + path
-    request = Request(
-        url,
-        method=method,
-        data=json.dumps(body).encode() if body else None,
-        headers={
-            "Authorization": "ApiKey " + os.environ["ES_API_KEY"],
-            "Content-Type": "application/json",
-        },
-    )
-    with urlopen(request, timeout=timeout) as response:
-        return json.load(response)
+async def review_question(text: str, groups: list[Group], talk_id: str) -> Review:
+    segment = score = None
+    source = "unavailable"
+    if os.getenv("ES_URL") and os.getenv("ES_API_KEY"):
+        from elastic_transport import TransportError
+        from elasticsearch import ApiError
 
+        from roompass import search
 
-def review_question(text: str, groups: list[Group]) -> Review:
-    words = tokens(text)
-    result = Review()
-    # This small vocabulary belongs to the two seeded replay passages.
-    for entry in PASSAGES.values():
-        if words & tokens(str(entry["terms"])):
-            result.segment = int(entry["segment"])
-            break
-    if os.environ.get("ES_URL") and os.environ.get("ES_API_KEY"):
         try:
-            hits = elastic(
-                "POST",
-                "/_search",
-                {
-                    "size": 1,
-                    "query": {
-                        "multi_match": {
-                            "query": " ".join(sorted(words)),
-                            "fields": ["en", "es", "terms^2"],
-                            "minimum_should_match": "1",
-                        }
-                    },
-                },
-            )
-            result.source = "elasticsearch"
-            result.segment = None
-            for hit in hits["hits"]["hits"]:
-                if hit["_id"] in PASSAGES and words & tokens(PASSAGES[hit["_id"]]["terms"]):
-                    result.segment = int(PASSAGES[hit["_id"]]["segment"])
-                    result.score = hit["_score"]
-        except (URLError, TimeoutError, ValueError, KeyError):
-            pass  # The seeded replay remains available offline.
+            covered, matches = await search.check_question(text, talk_id)
+            source = "elasticsearch"
+            if covered and matches:
+                segment, score = matches[0].seq, matches[0].score
+        except (ApiError, TransportError):
+            # A search outage must never turn into a positive coverage decision.
+            source = "unavailable"
+    wording = await asyncio.to_thread(language_for, text)
+    action, target = await asyncio.to_thread(route_question, wording.english, groups)
+    return Review(target=target, suggestion=action, source=source, segment=segment, score=score)
+
+
+def route_question(text: str, groups: list[Group]) -> tuple[str, str | None]:
+    words = tokens(text)
     candidates = []
     for group in groups:
         candidates.append((group.id, group.id, group.translation or group.text))
@@ -112,26 +74,14 @@ def review_question(text: str, groups: list[Group]) -> Review:
     action, target = samples.get(text.strip().casefold(), ("ask", None))
     if exact:
         action, target = "support", exact[0]
-    covered = action == "support" and any(
-        group.id == target and group.segment == result.segment for group in groups
-    )
-    passage = next((p["en"] for p in PASSAGES.values() if p["segment"] == result.segment), "")
-    if candidates and os.environ.get("ROOMPASS_QA_DECISIONS") == "1":
+    if not exact and candidates and os.environ.get("ROOMPASS_QA_DECISIONS") == "1":
         try:
-            route = classify(tuple(candidates[:8]), text, passage)
+            route = classify(tuple(candidates[:8]), text)
             if route is not None:
-                model_action, model_target, covered = route
-                if not exact:
-                    action, target = model_action, model_target
+                action, target = route
         except (URLError, TimeoutError, ValueError, KeyError, IndexError, TypeError):
             pass
-    return Review(
-        target=target,
-        suggestion=action,
-        source=result.source,
-        segment=result.segment if covered else None,
-        score=result.score if covered else None,
-    )
+    return action, target
 
 
 class Choice(BaseModel):
@@ -141,8 +91,8 @@ class Choice(BaseModel):
 
 @lru_cache(maxsize=128)
 def classify(
-    candidates: tuple[tuple[str, str, str], ...], draft: str, caption: str
-) -> tuple[str, str | None, bool] | None:
+    candidates: tuple[tuple[str, str, str], ...], draft: str
+) -> tuple[str, str | None] | None:
     global _decision_budget
     with _decision_lock:
         if _decision_budget <= 0:
@@ -166,9 +116,7 @@ def classify(
             "choices": options,
         }
     ]
-    if caption:
-        criteria.append(COVERAGE_QUESTION)
-    data = {"draft": draft, "caption": caption, "questions": questions}
+    data = {"draft": draft, "questions": questions}
     body = {
         "model": "gpt-6-luna",
         "input": [{"role": "user", "content": [{"type": "input_json", "data": data}]}],
@@ -185,11 +133,37 @@ def classify(
     with urlopen(request, timeout=4) as response:
         answers = [Choice.model_validate(item) for item in json.load(response)["answers"]]
     values = {answer.name: answer.choice for answer in answers}
-    action, target = routes[values["route"]]
-    return action, target, bool(caption and values.get("coverage") == "answered")
+    return routes[values["route"]]
 
 
 if __name__ == "__main__":
-    # Only writes these two demo documents; rerunning replaces them by stable id.
-    for passage_id, passage in PASSAGES.items():
-        elastic("PUT", f"/_doc/{passage_id}?refresh=wait_for", passage, timeout=25)
+    from datetime import UTC, datetime
+    from pathlib import Path
+
+    from roompass import search
+    from roompass.contract import Segment
+
+    async def seed_replay() -> None:
+        fixture = Path(__file__).resolve().parents[2] / "web/src/replayCaptions.json"
+        rows = json.loads(fixture.read_text())
+        try:
+            for row in rows:
+                seq = row["id"]
+                minutes, seconds = map(int, row["time"].split(":"))
+                offset = minutes * 60 + seconds
+                await search.index_segment(
+                    Segment(
+                        id=f"{REPLAY_TALK}-{seq}",
+                        talk_id=REPLAY_TALK,
+                        seq=seq,
+                        t_start=offset,
+                        t_end=offset + 5,
+                        text_en=row["en"],
+                        text_es=row["es"],
+                        emitted_at=datetime.now(UTC),
+                    )
+                )
+        finally:
+            await search.es.close()
+
+    asyncio.run(seed_replay())

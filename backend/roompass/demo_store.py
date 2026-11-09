@@ -27,6 +27,16 @@ def database() -> Iterator[sqlite3.Connection]:
                 text TEXT PRIMARY KEY, lang TEXT NOT NULL, english TEXT NOT NULL
             )""")
         db.execute("""
+            CREATE TABLE IF NOT EXISTS checked_captions (
+                room TEXT, talk TEXT, device TEXT, text TEXT, seq INTEGER,
+                PRIMARY KEY(room,talk,device,text)
+            )""")
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS contribution_captions (
+                room TEXT, device TEXT, request TEXT, talk TEXT NOT NULL,
+                PRIMARY KEY(room,device,request)
+            )""")
+        db.execute("""
             CREATE TABLE IF NOT EXISTS room_voice (
                 room TEXT PRIMARY KEY, talk_id TEXT NOT NULL
             )""")

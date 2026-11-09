@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { z } from 'zod'
 import type { Segment } from '@/api/contract'
 import { speakerToken } from '@/api/replay'
+import { demoPath } from '@/api/demo'
+import { liveSpeaker, saveSpeaker, talksUrl } from '@/api/liveTalk'
 
-const base = (import.meta.env.VITE_API_URL ?? '/api') + '/talks/'
+const base = talksUrl + '/'
 const segment = z.object({
   id: z.string(), talk_id: z.string(), seq: z.number().int(), t_start: z.number(),
   t_end: z.number(), text_en: z.string(), text_es: z.string().nullable(), emitted_at: z.string(),
@@ -42,10 +44,16 @@ export async function recordVoice(stream: MediaStream, id: string, fail: (messag
   const mimeType = voiceFormat()
   if (!mimeType) throw new Error('This browser cannot record voice. Use Safari or Chrome.')
   const filename = mimeType.includes('mp4') ? 'voice.mp4' : 'voice.webm'
-  const headers = { 'X-Speaker-Token': speakerToken() }
-  const response = await fetch(base + id + '/capture', {headers, cache: 'no-store'})
+  const session = liveSpeaker(id)
+  const headers = { 'X-Speaker-Token': session?.token ?? speakerToken() }
+  const response = await fetch(session ? demoPath + '/replay' : base + id + '/capture',
+    {headers: session ? undefined : headers, cache: 'no-store'})
   if (!response.ok) throw new Error('Open the browser that started this talk to capture voice.')
-  const position = z.object({seq: z.number().int(), elapsed: z.number()}).parse(await response.json())
+  const snapshot = await response.json()
+  const position = session
+    ? z.object({server_ms: z.number(), started_ms: z.number(), voice_id: z.literal(id)})
+        .transform(room => ({seq: session.next, elapsed: Math.max(0, room.server_ms - room.started_ms) / 1000})).parse(snapshot)
+    : z.object({seq: z.number().int(), elapsed: z.number()}).parse(snapshot)
   const anchor = performance.now()
   const elapsed = () => position.elapsed + (performance.now() - anchor) / 1000
   let seq = position.seq
@@ -69,6 +77,7 @@ export async function recordVoice(stream: MediaStream, id: string, fail: (messag
     const chunks: Blob[] = []
     const start = elapsed()
     const number = seq++
+    if (session) saveSpeaker({...session, next: seq})
     recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data) }
     recorder.onerror = () => abort('Audio capture was interrupted. Reconnect the audio source.')
     recorder.onstop = () => {

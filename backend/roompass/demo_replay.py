@@ -47,6 +47,8 @@ async def control_replay(
     revision: int,
     token: Annotated[UUID, Header(alias="X-Speaker-Token")],
     voice: bool = False,
+    talk_id: str | None = None,
+    x_live_speaker_token: Annotated[str | None, Header()] = None,
 ) -> DemoReplay:
     owner = hashlib.sha256(token.bytes).hexdigest()
     lock = room_locks.setdefault(room, asyncio.Lock())
@@ -60,7 +62,22 @@ async def control_replay(
             raise HTTPException(409, "The replay changed. Check the current room state.")
         if action == "start" and state.started_ms is None:
             state.started_ms = state.server_ms
-            if voice:
+            if talk_id:
+                from roompass import pipeline, search
+
+                found = await search.get_talk(talk_id)
+                if (
+                    not found
+                    or not x_live_speaker_token
+                    or found[1] != pipeline.hash_token(x_live_speaker_token)
+                ):
+                    raise HTTPException(403, "Invalid live talk credentials.")
+                live = found[0]
+                if live.status != "live" or not live.started_at or live.room != room:
+                    raise HTTPException(409, "The talk is not live in this room.")
+                state.voice_id = live.talk_id
+                state.started_ms = int(live.started_at.timestamp() * 1000)
+            elif voice:
                 from roompass.api import voice_enabled
 
                 if not voice_enabled:
@@ -79,7 +96,15 @@ async def control_replay(
                 state.voice_id = live.talk_id
                 state.started_ms = int(live.started_at.timestamp() * 1000)
         elif action == "stop" and state.started_ms is not None and state.stopped_ms is None:
-            if state.voice_id:
+            if state.voice_id and x_live_speaker_token:
+                from roompass import pipeline, search
+
+                found = await search.get_talk(state.voice_id)
+                if not found or found[1] != pipeline.hash_token(x_live_speaker_token):
+                    raise HTTPException(403, "Invalid live talk credentials.")
+                if found[0].status != "ended":
+                    raise HTTPException(409, "Finish the live talk first.")
+            elif state.voice_id:
                 from roompass import pipeline
 
                 await pipeline.stop_talk(state.voice_id, str(token))
