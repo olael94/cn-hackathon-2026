@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Health",
+  "type": "object",
+  "properties": {
+    "status": { "type": "string" },
+    "version": { "type": "string" }
+  },
+  "required": ["status", "version"],
+  "additionalProperties": false
+}

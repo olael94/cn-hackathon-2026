@@ -1,20 +1,9 @@
-import { useEffect, useState } from 'react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { getHealth, type Health } from '@/api/client'
+import { useHealth } from '@/api/client'
 
 function App() {
-  const [health, setHealth] = useState<Health | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    getHealth()
-      .then(setHealth)
-      .catch((error: unknown) => {
-        console.error(error)
-        setFailed(true)
-      })
-  }, [])
+  const { data: health, isError: failed } = useHealth()
 
   return (
     <main className="mx-auto flex min-h-svh max-w-md flex-col justify-center gap-4 p-4">

@@ -13,11 +13,13 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "datamodel-code-generator>=0.91.0",
     "ruff>=0.17.4",
 ]
 
 [tool.ruff]
 line-length = 100
+extend-exclude = ["roompass/generated"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
