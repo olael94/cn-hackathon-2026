@@ -46,6 +46,7 @@ jobs:
           build-args: |
             VITE_DASH0_ENDPOINT=${{ vars.VITE_DASH0_ENDPOINT }}
             VITE_DASH0_AUTH_TOKEN=${{ secrets.VITE_DASH0_AUTH_TOKEN }}
+            VITE_APP_VERSION=${{ steps.meta.outputs.tag }}
           tags: |
             ${{ steps.meta.outputs.image }}:web-${{ steps.meta.outputs.tag }}
             ${{ steps.meta.outputs.image }}:web-latest

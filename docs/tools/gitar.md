@@ -50,6 +50,8 @@ PRs 1 to 3, #10 (flagd and translator manifests) and #18 (Radar audit fixes, `Ru
 | #24 | Bug | No code sends `roompass.caption.late`, so the caption SLO and `CaptionsLate` alert get no data | Taken, with a different fix. Gitar suggested a phone `sendEvent`, but the phone still shows seeded lag. The backend now sets the lag on the `pipeline.publish` span, and the alert, SLO and panels count spans |
 | #24 | Bug | `PipelineErrors` misses translate and index failures, because the caught exceptions never set span status ERROR | Taken. `translate()` and `index_quietly()` now set `StatusCode.ERROR` |
 | #24 | Bug | Chaos panel groups by `roompass.chaos`, which no span sets | Taken in part. Panel now splits by `translator.fallback`, which the code sets. Nothing reads the chaos flag yet: Open |
+| #27 | Quality | Probe and log findings from live Dash0 data had no entry in `docs/tools/dash0.md` (rule "Tool finding is logged" failed) | Taken. Two rows added under Tooling problems in `docs/tools/dash0.md` |
+| #27 | Edge case | Error % panels per stage, service and route show "No data" instead of 0% when a group has no errors | Taken. All three use `or 0 * sum by (...)` to keep a 0 line per group |
 
 ## Rejected
 

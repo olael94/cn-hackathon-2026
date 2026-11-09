@@ -1,6 +1,6 @@
 # Cloud Native Hackathon: Brief
 
-Cut-down version of `docs/RoomPass Brief.md` for the time we have. **`CONTRACT.md` wins wherever the two disagree.** This file is what agents read before a phase. Editing it is "ask first".
+Cut-down version of `docs/brief-full.md` for the time we have. **`CONTRACT.md` wins wherever the two disagree.** This file is what agents read before a phase. Editing it is "ask first".
 
 **Event:** WeMakeDevs Cloud Native Hackathon, Mon Nov 9 2026, The Shop, Salt Lake City
 **Format:** team of 3 · build until 4:45 PM, submit by 5:30 PM · 5-minute demo (confirm)
