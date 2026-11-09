@@ -24,7 +24,7 @@
 | 05 | Wow moment hardened: thresholds, chaos rehearsal, real incident | All 3 | | 06 | `phase-05-wow.md` | H4 | |
 | 06 | Stretch: catch me up | Pipeline | | 05 | `phase-06-catchup.md` | H4, only if 05 is on track | |
 | 07 | Last mile: audit, personas, polish, docs, backup video | All 3 | | Split by owner | `phase-07-last-mile.md` | H4.5 to H5 | |
-| 08 | Stretch: question themes | Platform (Miguel) | | 02, 03, 04 | `phase-08-question-themes.md` | H1 to H4, after catch up | |
+| 08 | Stretch: question themes | Platform (Miguel) | | 06 | `phase-08-question-themes.md` | H4, after 06 and only if 05 is on track | |
 
 ### Sync points (all three lanes meet, nobody moves on until it works)
 

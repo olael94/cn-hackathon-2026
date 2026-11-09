@@ -124,7 +124,7 @@ The 4 or 5 themes that cover most of the questions, for the speaker to answer in
 }
 ```
 - At most 5 themes, most `votes` first. `votes` is the sum over `question_ids`.
-- Off topic: a question whose best semantic score against the talk's segments is under `0.5`. It stays in the question list, but no theme includes it.
+- Off topic: a question whose best semantic score against the talk's segments is under `0.65` (`score` is `(1 + cos) / 2`, so 0.5 means no similarity at all; tune on the 10 seeded unrelated questions). It stays in the question list, but no theme includes it.
 - Grouping is plain code: take the on-topic questions by votes, each ungrouped one starts a theme and pulls in ungrouped questions with semantic score `>= 0.75` against it. Themes of one question are dropped. Tune both cutoffs on the seeded questions.
 - `label` is written by a model from the `text_en` of the theme's questions and must cite only that theme's `question_ids`. If it doesn't, or the call fails, `label` is the top question's `text_en`.
 - Rebuilt after every 5 new questions or 60 s, whichever comes first, and only if questions or votes changed.
