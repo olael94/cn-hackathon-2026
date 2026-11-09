@@ -20,10 +20,11 @@
 | 01 | Contract + seed data | All 3 | Yes | Nothing | `phase-01-contract.md` | H0, 20 min | |
 | 02 | Pipeline lane: audio in, STT, translator, flags hooks | Pipeline | | 03, 04 | `phase-02-pipeline.md` | H1 to H3 | |
 | 03 | App lane: api, Elasticsearch, Q&A match, phone page, speaker view | App | | 02, 04 | `phase-03-app.md` | H1 to H3 | |
-| 04 | Platform lane: cluster, Redis, flagd, Dash0, SLO, Gitar rules | Platform | | 02, 03 | `phase-04-platform.md` | H1 to H3 | |
+| 04 | Platform lane: cluster, translator Deployment, flagd, Dash0, SLO, Gitar rules | Platform | | 02, 03 | `phase-04-platform.md` | H1 to H3 | |
 | 05 | Wow moment hardened: thresholds, chaos rehearsal, real incident | All 3 | | 06 | `phase-05-wow.md` | H4 | |
 | 06 | Stretch: catch me up | Pipeline | | 05 | `phase-06-catchup.md` | H4, only if 05 is on track | |
 | 07 | Last mile: audit, personas, polish, docs, backup video | All 3 | | Split by owner | `phase-07-last-mile.md` | H4.5 to H5 | |
+| 08 | Stretch: question themes | Platform (Miguel) | | 02, 03, 04 | `phase-08-question-themes.md` | H1 to H4, after catch up | |
 
 ### Sync points (all three lanes meet, nobody moves on until it works)
 
@@ -38,9 +39,9 @@
 
 After phase 01, the three lanes run at the same time and should not wait on each other.
 
-- **One lane, one folder set, one branch.** Pipeline: `backend/roompass/pipeline/`, `backend/roompass/translator/`. App: `backend/roompass/api/`, `web/`. Platform: `deploy/`, `.github/`, `.gitar/`, flagd config. Shared models in `backend/roompass/models/` are frozen after 01.
+- **One lane, one folder set, one branch.** Pipeline: `backend/roompass/pipeline/`, `backend/roompass/translator/`. App: `backend/roompass/api/`, `web/`. Platform: `deploy/`, `.github/`, `.gitar/`, flagd config. Shared models in `backend/roompass/contract.py` and `web/src/api/contract.ts` are frozen after 01.
 - **Build against the contract, not each other.** Each lane gets a fake for what it consumes:
-  - App builds the phone page against a replay of the seeded segments over SSE, and the api against seeded Redis streams.
+  - App builds the phone page against a replay of the seeded segments over SSE, and the api against seeded Elasticsearch segments.
   - Pipeline tests the translator on fixture text, and the pipeline on the recorded 3-minute test talk.
   - Platform deploys the current images and placeholder processes until the real ones land.
 - **Split inside a lane too (subagents, AGT-03).** These pairs share no files:
@@ -81,4 +82,4 @@ Copied verbatim from the brief's "Must ship".
 - **Judges scanning the QR as part of the demo:** bonus only. 12 judges typing takes 60+ seconds, so the demo runs on our phones.
 - **The placeholder `web/` hello page and `/api/health`:** replaced by the real phone page and api in 03.
 
-**Cut order if late:** catch me up, then the Moonshine swap, then the question filter.
+**Cut order if late:** question themes, then catch me up, then the Moonshine swap, then the question filter.

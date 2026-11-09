@@ -3,7 +3,7 @@
 This file is the agreement between `backend/` and `web/`. Build against it in parallel.
 Changing anything here is "ask the team first", and the change lands in the same PR as the code.
 
-- Backend: pydantic models in `backend/contract.py` mirror this file.
+- Backend: pydantic models in `backend/roompass/contract.py` mirror this file.
 - Frontend: zod schemas in `web/src/api/contract.ts` mirror this file.
 - Every path is under `/api`, because nginx in `web/` only forwards `/api/` to the backend.
 
@@ -104,6 +104,31 @@ One caption line that might already answer a question.
 - Every bullet cites at least one existing `segment_id`. The backend drops any bullet that doesn't (the citation validator).
 - Cached per talk and language for 30 s.
 
+### ThemeSet
+The 4 or 5 themes that cover most of the questions, for the speaker to answer in groups. It adds to the question list, it never replaces it.
+```json
+{
+  "talk_id": "k8s7fa",
+  "themes": [
+    {
+      "id": "th_3",
+      "label": "Setting resource requests for autoscaling",
+      "question_ids": ["q_8f2c1a", "q_1b9e04", "q_77ad20"],
+      "top_question_id": "q_8f2c1a",
+      "votes": 9
+    }
+  ],
+  "question_count": 14,
+  "off_topic_count": 2,
+  "built_at": "2026-11-09T21:08:00.000Z"
+}
+```
+- At most 5 themes, most `votes` first. `votes` is the sum over `question_ids`.
+- Off topic: a question whose best semantic score against the talk's segments is under `0.5`. It stays in the question list, but no theme includes it.
+- Grouping is plain code: take the on-topic questions by votes, each ungrouped one starts a theme and pulls in ungrouped questions with semantic score `>= 0.75` against it. Themes of one question are dropped. Tune both cutoffs on the seeded questions.
+- `label` is written by a model from the `text_en` of the theme's questions and must cite only that theme's `question_ids`. If it doesn't, or the call fails, `label` is the top question's `text_en`.
+- Rebuilt after every 5 new questions or 60 s, whichever comes first, and only if questions or votes changed.
+
 ## Endpoints
 
 | Method | Path | Auth | Body | Returns |
@@ -120,6 +145,7 @@ One caption line that might already answer a question.
 | POST | `/api/talks/{talk_id}/questions/{question_id}/vote` | viewer | | `Question` (one vote per device, repeat votes are ignored) |
 | GET | `/api/talks/{talk_id}/questions` | none | | `Question[]`, most votes first |
 | GET | `/api/talks/{talk_id}/catchup?lang=en` | none | | `CatchUp` |
+| GET | `/api/talks/{talk_id}/themes` | none | | `ThemeSet` (empty `themes` until there are 2 related questions) |
 | GET | `/api/health` | none | | `{status, version}` (already built) |
 
 Status codes: `401` bad or missing speaker token, `404` unknown talk, `409` talk not live (audio or questions on a talk that isn't live), `429` more than 3 questions per minute from one device.
@@ -140,6 +166,7 @@ Each event has an `event:` name and a JSON `data:` line.
 | `segment` | `seq` | `Segment` | A new caption line |
 | `question` | none | `Question` | New question or new vote count |
 | `talk` | none | `Talk` | Status changes (`live`, `ended`) |
+| `themes` | none | `ThemeSet` | After each rebuild |
 
 - A `: ping` comment every 15 s keeps proxies from closing the stream.
 - **Reconnect:** the browser sends `Last-Event-ID` (the last segment `seq`). The backend replays segments with a higher `seq` from its in-memory per-talk buffer first, falling back to Elasticsearch for older ones (deduped by `seq`), then continues live. The buffer covers published segments not yet visible in Elasticsearch; sequences skipped under Audio chunks produce no segment and cannot be replayed.
@@ -166,6 +193,7 @@ Backend spans, one trace per audio chunk:
 | `pipeline.publish` | `talk.id`, `segment.seq`, `sse.subscribers` |
 | `catchup.generate` | `talk.id`, `catchup.bullets_returned`, `catchup.bullets_dropped` |
 | `questions.check` | `talk.id`, `match.top_score`, `match.covered` |
+| `themes.build` | `talk.id`, `themes.count`, `questions.count`, `questions.off_topic`, `themes.labels_dropped`, `gen_ai.request.model` |
 
 Never put transcript text or question text in span attributes or logs. IDs, counts and timings only.
 
@@ -175,9 +203,9 @@ Never put transcript text or question text in span attributes or logs. IDs, coun
 |---|---|---|
 | `talks` | `talk_id` | `title`, `speaker_name`, `room`, `status`, `started_at`, `ended_at`, `speaker_token_hash` (keyword) |
 | `segments` | `{talk_id}-{seq}` | `talk_id` (keyword), `seq` (int), `t_start`, `t_end` (float), `text_en` (text, english analyzer), `text_es` (text, spanish analyzer), `semantic` (`semantic_text` with an explicit **multilingual** `inference_id`), `emitted_at` (date) |
-| `questions` | `id` | `talk_id` (keyword), `text`, `lang`, `text_en`, `votes` (int), `voters` (keyword array of device ids), `created_at` |
+| `questions` | `id` | `talk_id` (keyword), `text`, `lang`, `text_en`, `votes` (int), `voters` (keyword array of device ids), `created_at`, `semantic` (`semantic_text`, same `inference_id` as `segments`), `topic_score` (float) |
 
-- `semantic` holds `text_en`, so English and Spanish questions both match it.
+- `semantic` holds `text_en`, so English and Spanish questions both match it. On `questions` it is used to group questions into themes.
 - "Possibly covered" = BM25 on `text_en` and `text_es` plus semantic on `semantic`, combined with RRF for ordering. `covered` is true only when the top RRF-ordered match is a keyword hit with semantic `score >= 0.6`, or has semantic `score >= 0.8`. Tune these on about 10 seeded pairs.
 
 ## Who owns what
@@ -187,5 +215,6 @@ Never put transcript text or question text in span attributes or logs. IDs, coun
 | Pipeline + Elasticsearch | Oliver | `backend/` (pipeline, search, catch-up) |
 | Phone and speaker views | Frontend teammate | `web/src/` |
 | Platform, Dash0, Radar, Gitar | Miguel | `deploy/`, `.github/`, `.gitar/`, telemetry setup, `docs/tools/` |
+| Question themes | Miguel | `backend/roompass/themes/` |
 
-Shared: `CONTRACT.md`, `backend/contract.py`, `web/src/api/contract.ts`. Change them only with the team's OK.
+Shared: `CONTRACT.md`, `backend/roompass/contract.py`, `web/src/api/contract.ts`. Change them only with the team's OK.

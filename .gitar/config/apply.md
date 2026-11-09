@@ -11,7 +11,7 @@ Auto-apply fixes so CI goes green, but a human decides anything that changes beh
 
 ## Gitar must not auto-apply (suggest only)
 - Anything in `deploy/`, `argocd/`, `.github/workflows/` or `.gitar/`.
-- `CONTRACT.md`, `backend/contract.py` or `web/src/api/contract.ts`.
+- `CONTRACT.md`, `backend/roompass/contract.py` or `web/src/api/contract.ts`.
 - Anything touching secrets, env var names, `.env.example` or auth (speaker token handling).
 - Changes to the citation validator or the "possibly covered" thresholds.
 - Deleting or weakening a test to make CI pass.
