@@ -1,15 +1,11 @@
 import os
 
 from fastapi import FastAPI
-from pydantic import BaseModel
 
-app = FastAPI()
+from roompass.generated.health import Health
+
+app = FastAPI(title="RoomPass api")
 version = os.environ.get("APP_VERSION", "dev")
-
-
-class Health(BaseModel):
-    status: str
-    version: str
 
 
 @app.get("/healthz")

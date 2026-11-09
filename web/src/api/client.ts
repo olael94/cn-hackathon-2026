@@ -1,4 +1,6 @@
+import { useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
+import type { Health } from '@/types/generated/health'
 
 const apiUrl = import.meta.env.VITE_API_URL ?? '/api'
 
@@ -10,13 +12,11 @@ export async function getJson<T>(path: string, schema: z.ZodType<T>): Promise<T>
   return schema.parse(await response.json())
 }
 
-export const healthSchema = z.object({
+const healthSchema: z.ZodType<Health> = z.strictObject({
   status: z.string(),
   version: z.string(),
 })
 
-export type Health = z.infer<typeof healthSchema>
-
-export function getHealth(): Promise<Health> {
-  return getJson('/health', healthSchema)
+export function useHealth() {
+  return useQuery({ queryKey: ['health'], queryFn: () => getJson('/health', healthSchema) })
 }
