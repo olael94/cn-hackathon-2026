@@ -25,6 +25,12 @@ spec:
           env:
             - name: OTEL_SERVICE_NAME
               value: translator
+            - name: TRANSLATOR_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-credentials
+                  key: translator-token
+                  optional: true
             - name: FLAGD_HOST
               value: flagd
             - name: FLAGD_PORT

@@ -48,7 +48,7 @@ The deployed app reads keys from Secret `app-credentials` in `team-the-mok-team`
 as `~/cnh-kubeconfig`):
 
 ```bash
-set -a && . ./.env && set +a && KUBECONFIG=~/cnh-kubeconfig kubectl -n team-the-mok-team create secret generic app-credentials --from-literal=openai-api-key="$OPENAI_API_KEY" --from-literal=es-url="$ES_URL" --from-literal=es-api-key="$ES_API_KEY" --from-literal=dash0-auth-token="$DASH0_AUTH_TOKEN" --from-literal=otel-endpoint="$OTEL_EXPORTER_OTLP_ENDPOINT"
+set -a && . ./.env && set +a && KUBECONFIG=~/cnh-kubeconfig kubectl -n team-the-mok-team create secret generic app-credentials --from-literal=openai-api-key="$OPENAI_API_KEY" --from-literal=es-url="$ES_URL" --from-literal=es-api-key="$ES_API_KEY" --from-literal=dash0-auth-token="$DASH0_AUTH_TOKEN" --from-literal=otel-endpoint="$OTEL_EXPORTER_OTLP_ENDPOINT" --from-literal=translator-token="$TRANSLATOR_TOKEN"
 ```
 
 ## Fallbacks

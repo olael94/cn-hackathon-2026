@@ -29,6 +29,8 @@ PRs 1 to 3 and #10 (flagd and translator manifests) had no findings. PR 1 was th
 | #14 | Bug | `[1m]` rate windows can return no data with a 1-minute SignalControl aggregation, leaving panels empty and the lag alert silent | Taken. Fixed by @melizalde-ds in `8cb2d9a`: every window is `[2m]` |
 | #15 | Quality | Radar budget row mixed scopes: memory requests 1856Mi above limits 1152Mi, which Kubernetes can't allow | Taken. Fixed by @melizalde-ds in this PR: namespace and cluster totals stated separately |
 | #16 | Edge case | One-backend-pod rule skipped kustomize `replicas:` or `patches:` overrides in `deploy/kustomization.yaml` | Taken. Fixed by @melizalde-ds in `3c77b39`: trigger covers kustomization overrides |
+| #20 | Bug | Themes cache never refreshed, because nothing calls `note_question_change` yet, so the first `ThemeSet` stayed for the whole talk | Taken. Fixed by @melizalde-ds in `7c4f8c5`: rebuild when the cached set is older than 60 seconds |
+| #20 | Quality | `.env.example` set `THEMES_LABEL_MODEL=gpt-5.4-mini`, a second copy of the code default | Taken. Fixed by @melizalde-ds in `7c4f8c5`: value left empty, and an empty value falls back to the default |
 
 ## Rejected
 
