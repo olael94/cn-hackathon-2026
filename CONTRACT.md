@@ -57,7 +57,7 @@ One finished caption line, from one audio chunk.
   "emitted_at": "2026-11-09T21:04:12.381Z"
 }
 ```
-- `id` is always `{talk_id}-{seq}`. `seq` starts at 0 and has no gaps.
+- `id` is always `{talk_id}-{seq}`. `seq` starts at 0 and increases by 1 per chunk. If the backend skips a `seq` as described under Audio chunks, it produces no `Segment` for it and never reuses its id.
 - `text_es` may be `null` if translation failed. The phone shows English with a "translation unavailable" note.
 
 ### Question
@@ -87,7 +87,7 @@ One caption line that might already answer a question.
   "keyword_hit": true
 }
 ```
-`score` is raw cosine similarity (0 to 1). The backend decides "possibly covered" with plain code, never an LLM.
+`score` is the Elasticsearch `_score` of the semantic sub-query alone (for cosine dense vectors: `(1 + cos) / 2`, 0 to 1), not the RRF score. RRF is used only to order `matches`. The backend decides "possibly covered" with plain code, never an LLM.
 
 ### CatchUp
 ```json
@@ -128,7 +128,7 @@ Status codes: `401` bad or missing speaker token, `404` unknown talk, `409` talk
 - Send whatever `MediaRecorder` produces (webm/opus). No resampling needed.
 - **Restart `MediaRecorder` every 5 s** so each chunk is a complete file with its own header. Do not use `timeslice`.
 - The speaker page computes `t_start` and `t_end` from when each recorder started and stopped, relative to the Start tap.
-- The backend processes chunks in `seq` order per talk.
+- The backend processes chunks in `seq` order per talk. If chunk N has not arrived or finished processing 10 s after chunk N+1 arrived, the backend skips N, emits no segment for it, and continues with N+1. A late N is discarded. Timing uses the server clock, and stopping a talk flushes any pending gap the same way.
 
 ## SSE stream: `GET /api/talks/{talk_id}/events`
 
@@ -142,7 +142,7 @@ Each event has an `event:` name and a JSON `data:` line.
 | `talk` | none | `Talk` | Status changes (`live`, `ended`) |
 
 - A `: ping` comment every 15 s keeps proxies from closing the stream.
-- **Reconnect:** the browser sends `Last-Event-ID` (the last segment `seq`). The backend first replays segments with a higher `seq` from Elasticsearch, then continues live. Nothing is lost on bad Wi-Fi.
+- **Reconnect:** the browser sends `Last-Event-ID` (the last segment `seq`). The backend replays segments with a higher `seq` from its in-memory per-talk buffer first, falling back to Elasticsearch for older ones (deduped by `seq`), then continues live. The buffer covers published segments not yet visible in Elasticsearch; sequences skipped under Audio chunks produce no segment and cannot be replayed.
 - Clock offset: `offset = server_time - Date.now()` at `hello`.
 
 ## Lag (the Dash0 SLO)
@@ -178,7 +178,7 @@ Never put transcript text or question text in span attributes or logs. IDs, coun
 | `questions` | `id` | `talk_id` (keyword), `text`, `lang`, `text_en`, `votes` (int), `voters` (keyword array of device ids), `created_at` |
 
 - `semantic` holds `text_en`, so English and Spanish questions both match it.
-- "Possibly covered" = BM25 on `text_en` and `text_es` plus semantic on `semantic`, combined with RRF for ordering. `covered` is true only when the top match is a keyword hit with `score >= 0.6`, or `score >= 0.8` on its own. Tune these on about 10 seeded pairs.
+- "Possibly covered" = BM25 on `text_en` and `text_es` plus semantic on `semantic`, combined with RRF for ordering. `covered` is true only when the top RRF-ordered match is a keyword hit with semantic `score >= 0.6`, or has semantic `score >= 0.8`. Tune these on about 10 seeded pairs.
 
 ## Who owns what
 
