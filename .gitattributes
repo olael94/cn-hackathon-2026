@@ -1,0 +1,9 @@
+# LF everywhere: deploy scripts run on Linux, and the repo is often edited from Windows/WSL.
+# A CRLF in a bash script breaks it on the box with "$'\r': command not found".
+* text=auto eol=lf
+
+# Hide lockfiles and generated types from diffs and GitHub language stats. Uncomment what applies.
+# pnpm-lock.yaml linguist-generated
+# Cargo.lock linguist-generated
+# uv.lock linguist-generated
+# src/types/generated/** linguist-generated
