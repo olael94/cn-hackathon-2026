@@ -1,6 +1,6 @@
 # Dash0 in RoomPass
 
-The lag number on the phone ("live · 6.2s behind") is the same number our SLO watches in Dash0. The product screen and the ops screen show one signal.
+The SLO watches caption lag measured on the backend. The lag on the phone ("live · 6.2s behind") is still seeded, so for now the product screen and the ops screen show different numbers.
 
 ## What we instrument
 
@@ -8,27 +8,17 @@ The lag number on the phone ("live · 6.2s behind") is the same number our SLO w
 |---|---|---|
 | Traces | Backend: `opentelemetry-instrument` (FastAPI auto-instrumentation) plus manual spans from `CONTRACT.md` ("Telemetry names"). One trace per audio chunk. | `pipeline.transcribe`, `pipeline.translate`, `pipeline.index`, `pipeline.publish`, `questions.check`, `themes.build`, `catchup.generate` |
 | Metrics | Dash0 synthetic span metrics (`dash0.spans`, `dash0.spans.duration`), log counts (`dash0.logs`) and uptime check runs (`dash0.synthetic_check.runs`) | p95 per span, error rate per span, share of late captions, uptime |
-| Logs | Backend logs exported over OTLP, and the phone's custom events (the web SDK sends events as log records) | IDs, counts and timings only. Never transcript or question text. |
-| RUM | `@dash0/sdk-web` in `web/src/telemetry.ts`: page views, fetch calls, errors, web vitals, and the `roompass.caption.lag` event | Lag per talk, as each phone sees it |
+| Logs | Backend logs exported over OTLP | IDs, counts and timings only. Never transcript or question text. |
+| RUM | `@dash0/sdk-web` in `web/src/telemetry.ts`: page views, fetch calls, errors, web vitals | How each phone loads and fails |
 
-How lag gets to Dash0: the web SDK has no metrics API, only `sendEvent`. So each phone sends a custom event named `roompass.caption.lag` with attributes `roompass.caption.lag` (seconds), `roompass.caption.late` (the string `"true"` when lag is over 10 s, else `"false"`) and `talk.id`. Dash0 counts those events in `dash0.logs` with a `roompass_caption_late` label, so no SignalControl rule is needed:
-
-```ts
-sendEvent('roompass.caption.lag', {
-  attributes: {
-    'roompass.caption.lag': lagSeconds,
-    'roompass.caption.late': String(lagSeconds > 10),
-    'talk.id': talkId,
-  },
-})
-```
+How lag gets to Dash0: the backend measures it. When `flush()` publishes a caption, the `pipeline.publish` span gets `roompass.caption.lag` (seconds from the audio chunk arriving to the caption going out) and `roompass.caption.late` (`"true"` over 10 s, else `"false"`). Dash0 counts those spans in `dash0.spans` with a `roompass_caption_late` label. This is server-side lag only: it leaves out the speaker's upload and the phone's network. The phone can't report its own lag yet, because it still shows seeded captions (`web/src/demoRoom.ts`).
 
 ## The SLOs
 
 **Captions on time: 95% under 10 s.** Dash0 SLOs are a ratio of good events to all events. "95% of caption lines reach the phone within 10 s" is the same thing as p95 lag under 10 s.
 
-- Good: lag events with `roompass_caption_late="false"`
-- Total: all lag events
+- Good: `pipeline.publish` spans with `roompass_caption_late="false"`
+- Total: all `pipeline.publish` spans
 - Window: rolling 28 days (the only window Dash0 offers today)
 
 **Public URL uptime: 99%.** An uptime check calls `https://the-mok-team.cnh.radarhq.io/api/health` every minute from us-oregon. Good: checks that pass. This one has data from day one.
@@ -39,7 +29,7 @@ Everything lives in `dash0/` and is applied with the Dash0 CLI. `.github/workflo
 
 | File | What it creates |
 |---|---|
-| `dash0/dashboard.yaml` | Dashboard "RoomPass health": late captions %, captions per minute, pipeline stage p95, pipeline errors, translate p95 by chaos flag, Q&A and themes p95, requests, server errors, server p95, uptime |
+| `dash0/dashboard.yaml` | Dashboard "RoomPass health": late captions %, captions per minute, pipeline stage p95, pipeline errors, translate p95 by fallback, Q&A and themes p95, requests, server errors, server p95, uptime |
 | `dash0/alerts.yaml` | Check rules `CaptionsLate` (over 5% late for 30 s), `PipelineErrors`, `ServerErrors`, `PublicUrlDown`. They email the Default Notification Channel |
 | `dash0/slo.yaml` | The two SLOs above |
 | `dash0/uptime.yaml` | The uptime check on the public URL |
@@ -48,21 +38,22 @@ The SLO's burn-rate alerts are tuned for a 28-day window, and SLOs settle about 
 
 To change something: edit the file, run `dash0 --agent-mode apply -f dash0/ --dry-run`, then merge. Locally, `dash0 apply -f dash0/` with the `roompass` CLI profile does the same.
 
-The chaos panel splits `pipeline.translate` by a span attribute `roompass.chaos` (`"true"` or `"false"`), which the translator sets from the `translator-chaos-delay-ms` flag.
+The fallback panel splits `pipeline.translate` by `translator.fallback`, which `translate()` sets to true when the remote translator fails and the backend translates locally.
+
+**Not built yet:** nothing reads `translator-chaos-delay-ms`. `python -m roompass translator` still exits with "not built yet", so steps 2 and 3 below can't run until the translator applies that delay.
 
 ## Chaos demo beat (demo path step 4)
 
 1. A talk is live. Phones show "live · 1.4s behind". Dashboard and SLO page open on the laptop.
 2. Flip the flagd flag `translator-chaos-delay-ms` to its `on` variant (10000 ms in `deploy/flagd.yaml`). Each translation now waits that long.
-3. On the phone the lag climbs past 10 s. On the dashboard, late captions go over 5% and `pipeline.translate` p95 jumps on the `chaos=true` line while the other spans stay flat. `CaptionsLate` fires. The SLO's SLI drops a few minutes later.
+3. On the phone the lag climbs past 10 s. On the dashboard, late captions go over 5% and `pipeline.translate` p95 jumps while the other spans stay flat. `CaptionsLate` fires. The SLO's SLI drops a few minutes later.
 4. Ask Agent0: "Why is caption lag up?" It should point at `pipeline.translate` (span durations in the traces of the slow segments).
 5. Flip `translator-fallback` on. Lag on the phone drops back within seconds. The dashboard follows within about two minutes (2-minute rate window, so it always spans at least two 1-minute aggregations).
 6. Flip both flags back off after the demo.
 
 ## Things to check on the day
 
-- The late flag must be a string (`"true"` / `"false"`): that is the form tested with `dash0 logs send`. A real phone event has not reached Dash0 yet.
-- Clamp lag to 0 before sending. A phone with a bad clock offset can report lag below 0.
+- The late flag is a string (`"true"` / `"false"`). Span attributes become labels on `dash0.spans`: `translator.remote` queried as `translator_remote="true"` (`dash0 metrics instant`, 2026-11-09). After the first live talk, check that `roompass_caption_late` shows up the same way.
 - The phone SDK needs the OTLP over HTTP endpoint and an ingest-only token (`VITE_DASH0_ENDPOINT`, `VITE_DASH0_AUTH_TOKEN`, set in GitHub for the web image build).
 
 ## Tooling problems

@@ -42,8 +42,8 @@ metadata:
   annotations:
     dash0.com/display-name: RoomPass captions on time
 spec:
-  description: 95% of captions reach a phone within 10 s of being spoken, the same as p95 lag under 10 s.
-  service: web
+  description: 95% of captions are published within 10 s of their audio arriving, the same as p95 lag under 10 s.
+  service: backend
   budgetingMethod: Occurrences
   timeWindow:
     - duration: 28d
@@ -58,12 +58,12 @@ spec:
           metricSource:
             type: Prometheus
             spec:
-              query: '{otel_metric_name="dash0.logs",roompass_caption_late="false"}'
+              query: '{otel_metric_name="dash0.spans",otel_span_name="pipeline.publish",roompass_caption_late="false"}'
         total:
           metricSource:
             type: Prometheus
             spec:
-              query: '{otel_metric_name="dash0.logs",roompass_caption_late=~"true|false"}'
+              query: '{otel_metric_name="dash0.spans",otel_span_name="pipeline.publish",roompass_caption_late=~"true|false"}'
   objectives:
     - displayName: 95% of captions under 10 s
       target: 0.95

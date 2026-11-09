@@ -31,6 +31,9 @@ PRs 1 to 3 and #10 (flagd and translator manifests) had no findings. PR 1 was th
 | #16 | Edge case | One-backend-pod rule skipped kustomize `replicas:` or `patches:` overrides in `deploy/kustomization.yaml` | Taken. Fixed by @melizalde-ds in `3c77b39`: trigger covers kustomization overrides |
 | #20 | Bug | Themes cache never refreshed, because nothing calls `note_question_change` yet, so the first `ThemeSet` stayed for the whole talk | Taken. Fixed by @melizalde-ds in `7c4f8c5`: rebuild when the cached set is older than 60 seconds |
 | #20 | Quality | `.env.example` set `THEMES_LABEL_MODEL=gpt-5.4-mini`, a second copy of the code default | Taken. Fixed by @melizalde-ds in `7c4f8c5`: value left empty, and an empty value falls back to the default |
+| #24 | Bug | No code sends `roompass.caption.late`, so the caption SLO and `CaptionsLate` alert get no data | Taken, with a different fix. Gitar suggested a phone `sendEvent`, but the phone still shows seeded lag. The backend now sets the lag on the `pipeline.publish` span, and the alert, SLO and panels count spans |
+| #24 | Bug | `PipelineErrors` misses translate and index failures, because the caught exceptions never set span status ERROR | Taken. `translate()` and `index_quietly()` now set `StatusCode.ERROR` |
+| #24 | Bug | Chaos panel groups by `roompass.chaos`, which no span sets | Taken in part. Panel now splits by `translator.fallback`, which the code sets. Nothing reads the chaos flag yet: Open |
 
 ## Rejected
 
