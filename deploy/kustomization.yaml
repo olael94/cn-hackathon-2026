@@ -11,10 +11,11 @@ resources:
   - backend.yaml
   - translator.yaml
   - flagd.yaml
+  - pdb.yaml
 images:
   - name: web
     newName: ghcr.io/olael94/cn-hackathon-2026
-    newTag: "web-188fda2"
+    newTag: "web-03152eb"
   - name: backend
     newName: ghcr.io/olael94/cn-hackathon-2026
-    newTag: backend-188fda2
+    newTag: backend-03152eb

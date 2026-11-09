@@ -218,14 +218,21 @@ async def translate(text: str, talk_id: str, seq: int) -> str | None:
         )
         try:
             if TRANSLATOR_URL:
-                async with httpx.AsyncClient(timeout=OPENAI_TIMEOUT_S) as client:
-                    response = await client.post(
-                        f"{TRANSLATOR_URL}/api/translate",
-                        json={"text": text, "source": "en", "target": "es"},
-                        headers={"X-Internal-Token": os.environ.get("TRANSLATOR_TOKEN", "")},
-                    )
-                    response.raise_for_status()
-                    return TranslateResponse.model_validate(response.json()).text
+                try:
+                    async with httpx.AsyncClient(timeout=OPENAI_TIMEOUT_S) as client:
+                        response = await client.post(
+                            f"{TRANSLATOR_URL}/api/translate",
+                            json={"text": text, "source": "en", "target": "es"},
+                            headers={"X-Internal-Token": os.environ.get("TRANSLATOR_TOKEN", "")},
+                        )
+                        response.raise_for_status()
+                        return TranslateResponse.model_validate(response.json()).text
+                except httpx.TimeoutException:
+                    raise  # a slow translator should show as lag, not be hidden
+                except Exception as error:  # noqa: BLE001 - rejected or unreachable translator
+                    # Keep Spanish captions flowing: translate here instead.
+                    span.set_attribute("translator.fallback", True)
+                    log.warning("translator unavailable, local fallback: %s", type(error).__name__)
             return await translate_local(text, "en", "es")
         except Exception as error:  # noqa: BLE001 - any failure means "no Spanish"
             span.record_exception(error)

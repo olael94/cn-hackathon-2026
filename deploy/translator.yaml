@@ -14,6 +14,7 @@ spec:
       labels:
         app: translator
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: translator
           image: backend
@@ -29,6 +30,7 @@ spec:
                 secretKeyRef:
                   name: app-credentials
                   key: translator-token
+                  optional: true
             - name: FLAGD_HOST
               value: flagd
             - name: FLAGD_PORT
