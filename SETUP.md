@@ -1,5 +1,7 @@
 # Setup status (prepared Nov 9, 2026, ~00:30)
 
+TEST to see if Gitar works.
+
 Everything below was installed and smoke-tested on this Mac. Nothing here is app code.
 If we don't use a tool, its removal command is in the last section.
 
