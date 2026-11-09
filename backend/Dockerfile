@@ -9,4 +9,4 @@ ARG APP_VERSION=dev
 ENV PATH=/backend/.venv/bin:$PATH APP_VERSION=$APP_VERSION OTEL_SERVICE_NAME=backend OTEL_SDK_DISABLED=true
 USER 1000
 EXPOSE 8000
-CMD ["opentelemetry-instrument", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["opentelemetry-instrument", "python", "-m", "roompass", "api"]

@@ -1,7 +1,7 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "FastAPI backend for the-mok-team"
+description = "RoomPass backend: api, pipeline and translator processes"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.162.2",
