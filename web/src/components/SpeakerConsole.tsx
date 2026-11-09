@@ -100,7 +100,8 @@ function stopTracks(stream: MediaStream | null) {
   stream?.getTracks().forEach((track) => track.stop())
 }
 
-function micError(error: unknown) {
+function captureError(error: unknown, tabAudio: boolean) {
+  if (tabAudio) return 'Select the video tab in desktop Chrome and turn on Share tab audio, then try again.'
   if (error instanceof DOMException && error.name === 'NotAllowedError') {
     return 'Allow microphone access in your browser’s site settings, then try again.'
   }
@@ -117,16 +118,18 @@ export default function SpeakerConsole({
   onReset,
 }: SpeakerProps) {
   const [save, setSave] = useState(false)
-  const [voice, setVoice] = useState(true)
+  const [source, setSource] = useState<'voice' | 'tab' | 'sample'>('voice')
+  const tabAudio = source === 'tab' && (phase === 'waiting' || Boolean(voiceId))
+  const voice = source !== 'sample'
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
-  const [micActive, setMicActive] = useState(false)
+  const [sourceActive, setSourceActive] = useState(false)
   const [previousPhase, setPreviousPhase] = useState(phase)
   const stream = useRef<MediaStream | null>(null)
   const stopRecorder = useRef<(() => Promise<void>) | null>(null)
   const request = useRef(0)
   const phaseRef = useRef(phase)
-  const releaseMic = useCallback(() => {
+  const releaseSource = useCallback(() => {
     request.current += 1
     void stopRecorder.current?.()
     stopRecorder.current = null
@@ -138,7 +141,7 @@ export default function SpeakerConsole({
     setPreviousPhase(phase)
     setError('')
     if (phase !== 'live') {
-      setMicActive(false)
+      setSourceActive(false)
       setPending(false)
     }
     if (phase === 'waiting') setSave(false)
@@ -146,23 +149,23 @@ export default function SpeakerConsole({
 
   useEffect(() => {
     phaseRef.current = phase
-    if (phase !== 'live') releaseMic()
-  }, [phase, releaseMic])
+    if (phase !== 'live') releaseSource()
+  }, [phase, releaseSource])
 
   useEffect(() => {
     function onPageHide() {
-      releaseMic()
-      setMicActive(false)
+      releaseSource()
+      setSourceActive(false)
       setPending(false)
     }
     window.addEventListener('pagehide', onPageHide)
     return () => {
-      releaseMic()
+      releaseSource()
       window.removeEventListener('pagehide', onPageHide)
     }
-  }, [releaseMic])
+  }, [releaseSource])
 
-  async function connectMicrophone() {
+  async function connectSource() {
     if (pending) return
     const attempt = ++request.current
     setPending(true)
@@ -172,13 +175,19 @@ export default function SpeakerConsole({
         setError('This browser cannot record voice. Use Safari or Chrome.')
         return
       }
-      if (!navigator.mediaDevices?.getUserMedia) {
+      if (!navigator.mediaDevices) {
         setError(
-          'Open the speaker link over HTTPS or on localhost to use your microphone.',
+          'Open the speaker link over HTTPS or on localhost to share audio.',
         )
         return
       }
-      const media = await navigator.mediaDevices.getUserMedia({ audio: true })
+      if (tabAudio && !navigator.mediaDevices.getDisplayMedia) {
+        setError('Open the speaker console and the video in desktop Chrome to share tab audio.')
+        return
+      }
+      const media = tabAudio
+        ? await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: 'browser' }, audio: true })
+        : await navigator.mediaDevices.getUserMedia({ audio: true })
       if (request.current !== attempt || phaseRef.current !== phase) {
         stopTracks(media)
         return
@@ -188,39 +197,46 @@ export default function SpeakerConsole({
         .find((item) => item.readyState === 'live')
       if (!track) {
         stopTracks(media)
-        setError('Your microphone disconnected. Connect it and try again.')
+        setError(tabAudio ? 'Choose a Chrome Tab and enable Share tab audio.' : 'Your microphone disconnected. Connect it and try again.')
+        return
+      }
+      const screen = media.getVideoTracks()[0]
+      if (tabAudio && screen?.getSettings().displaySurface && screen.getSettings().displaySurface !== 'browser') {
+        stopTracks(media)
+        setError('Select the tab playing the video in the Chrome Tab list.')
         return
       }
       stream.current = media
-      track.addEventListener(
-        'ended',
-        () => {
-          if (stream.current !== media) return
-          releaseMic()
-          setMicActive(false)
-          setError('Your microphone disconnected. Reconnect it to continue.')
-        },
-        { once: true },
-      )
+      // The picker supplies a video track as well. Send only the selected audio track to the recorder.
+      if (screen) screen.enabled = false
+      const disconnected = () => {
+        if (stream.current !== media) return
+        releaseSource()
+        setSourceActive(false)
+        setPending(false)
+        setError(tabAudio ? 'Tab sharing stopped. Share the video tab again to continue.' : 'Your microphone disconnected. Reconnect it to continue.')
+      }
+      screen?.addEventListener('ended', disconnected, { once: true })
+      track.addEventListener('ended', disconnected, { once: true })
       const id = phase === 'waiting' ? await onStart(save, voice) : voiceId
       if (request.current !== attempt) return
       if (id) {
-        const stop = await recordVoice(media, id, message => {
-          releaseMic()
-          setMicActive(false)
+        const stop = await recordVoice(new MediaStream([track]), id, message => {
+          releaseSource()
+          setSourceActive(false)
           setPending(false)
           setError(message)
         })
         if (request.current !== attempt) { void stop(); return }
         stopRecorder.current = stop
       }
-      setMicActive(true)
+      setSourceActive(true)
     } catch (failure) {
       if (request.current === attempt) {
-        console.error('Microphone access failed', failure)
-        releaseMic()
+        console.error('Audio capture failed', failure)
+        releaseSource()
         setPending(false)
-        setError(failure instanceof Error && !(failure instanceof DOMException) ? failure.message : micError(failure))
+        setError(failure instanceof Error && !(failure instanceof DOMException) ? failure.message : captureError(failure, tabAudio))
       }
     } finally {
       if (request.current === attempt) setPending(false)
@@ -230,8 +246,8 @@ export default function SpeakerConsole({
   async function finishTalk() {
     setPending(true)
     const uploads = stopRecorder.current?.()
-    releaseMic()
-    setMicActive(false)
+    releaseSource()
+    setSourceActive(false)
     try {
       await uploads
       onStop()
@@ -240,11 +256,11 @@ export default function SpeakerConsole({
     }
   }
 
-  const canConnect = phase === 'waiting' || (phase === 'live' && !micActive)
+  const canConnect = phase === 'waiting' || (phase === 'live' && !sourceActive)
   const startLabel = error
-    ? 'Try microphone again'
+    ? (tabAudio ? 'Share tab again' : 'Try microphone again')
     : phase === 'live'
-      ? 'Connect microphone'
+      ? (tabAudio ? 'Share video tab' : 'Connect microphone')
       : 'Start talk'
 
   return (
@@ -255,29 +271,36 @@ export default function SpeakerConsole({
       </div>
       <div className="grid gap-5 p-5 sm:p-6">
         <div role="status" className="flex items-center gap-3 font-bold">
-          {micActive ? (
+          {sourceActive ? (
             <AudioLines aria-hidden="true" />
           ) : (
             <MicOff aria-hidden="true" />
           )}
           {phase === 'waiting' && 'Ready to start'}
           {phase === 'live' &&
-            (micActive ? (voiceId ? 'Capturing your voice' : 'Microphone active') : 'Microphone disconnected')}
+            (sourceActive ? (tabAudio ? 'Capturing tab audio' : voiceId ? 'Capturing your voice' : 'Microphone active') : 'Audio source disconnected')}
           {phase === 'draining' && 'Finishing captions (5 s)'}
           {phase === 'ended' && 'Talk ended'}
         </div>
         {(phase === 'waiting' || phase === 'live') && (
           <p className="text-sm text-muted-foreground">
-            {(phase === 'waiting' ? voice : voiceId)
+            {tabAudio ? 'Select the video tab and enable Share tab audio. Play the video once capture starts.'
+              : (phase === 'waiting' ? voice : voiceId)
               ? 'Speak in English. Your voice is sent for transcription and Spanish translation.'
               : 'Replay the sample captions for this room.'}
           </p>
         )}
-        {phase === 'waiting' && (
+        {(phase === 'waiting' || (voiceId && !sourceActive && phase === 'live')) && (
           <label>Caption source{' '}
-            <select className="control" disabled={pending} value={voice ? 'voice' : 'sample'}
-              onChange={e => setVoice(e.target.value === 'voice')}>
-              <option value="voice">Live microphone</option><option value="sample">Sample replay</option>
+            <select className="control" disabled={pending} value={source}
+              onChange={e => {
+                const selected = e.target.value
+                setSource(selected === 'tab' || selected === 'sample' ? selected : 'voice')
+                setError('')
+              }}>
+              <option value="voice">Live microphone</option>
+              <option value="tab">Browser tab audio</option>
+              {phase === 'waiting' && <option value="sample">Sample replay</option>}
             </select>
           </label>
         )}
@@ -302,10 +325,10 @@ export default function SpeakerConsole({
           <Button
             className="primary-action min-h-12"
             disabled={pending || !ready}
-            onClick={connectMicrophone}
+            onClick={connectSource}
           >
             <Mic aria-hidden="true" />
-            {pending ? 'Waiting for microphone…' : startLabel}
+            {pending ? (tabAudio ? 'Connecting tab audio…' : 'Waiting for microphone…') : startLabel}
           </Button>
         )}
         {phase === 'live' && <HoldToStop onConfirm={() => void finishTalk()} disabled={!ready || pending} />}

@@ -70,7 +70,7 @@ export async function recordVoice(stream: MediaStream, id: string, fail: (messag
     const start = elapsed()
     const number = seq++
     recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data) }
-    recorder.onerror = () => abort('Voice capture was interrupted. Reconnect your microphone.')
+    recorder.onerror = () => abort('Audio capture was interrupted. Reconnect the audio source.')
     recorder.onstop = () => {
       window.clearTimeout(timer)
       const end = elapsed()
@@ -100,7 +100,7 @@ export async function recordVoice(stream: MediaStream, id: string, fail: (messag
       if (recorder.state === 'recording') recorder.stop()
     }, 5000)
   }
-  if (!stream.active) throw new Error('The microphone disconnected.')
+  if (!stream.active) throw new Error('The audio source disconnected.')
   capture()
   return () => {
     stopping = true

@@ -2,6 +2,8 @@
 
 ## Rehearse with two phones
 
+To caption an English-language video, open it in another desktop Chrome tab. In the speaker console choose **Browser tab audio**, then **Start talk**. Select the video tab, enable **Share tab audio**, and press **Share**. Play the video when the console shows **Capturing tab audio**. Attendees use the same room link.
+
 - For live voice, leave **Live microphone** selected and press **Start talk** on the speaker console. For the seeded Q&A rehearsal, select **Sample replay**. Both phones follow the same room.
 - Reload one phone during playback to check catch-up. Hold the speaker's end control for three seconds and check that both phones finish on the same caption after the five-second drain.
 
