@@ -33,7 +33,7 @@
                 "plugin": {
                   "kind": "PrometheusTimeSeriesQuery",
                   "spec": {
-                    "query": "histogram_quantile(0.95, sum(rate({otel_metric_name=\"roompass.caption.lag\"}[1m])))",
+                    "query": "histogram_quantile(0.95, sum(rate({otel_metric_name=\"roompass.caption.lag\"}[2m])))",
                     "seriesNameFormat": "p95"
                   }
                 }
@@ -45,7 +45,7 @@
                 "plugin": {
                   "kind": "PrometheusTimeSeriesQuery",
                   "spec": {
-                    "query": "histogram_quantile(0.5, sum(rate({otel_metric_name=\"roompass.caption.lag\"}[1m])))",
+                    "query": "histogram_quantile(0.5, sum(rate({otel_metric_name=\"roompass.caption.lag\"}[2m])))",
                     "seriesNameFormat": "p50"
                   }
                 }
@@ -87,7 +87,7 @@
                 "plugin": {
                   "kind": "PrometheusTimeSeriesQuery",
                   "spec": {
-                    "query": "histogram_quantile(0.95, sum by (otel_span_name) (rate({otel_metric_name=\"dash0.spans.duration\", otel_span_name=~\"pipeline.transcribe|pipeline.translate|pipeline.index|pipeline.publish\"}[1m])))",
+                    "query": "histogram_quantile(0.95, sum by (otel_span_name) (rate({otel_metric_name=\"dash0.spans.duration\", otel_span_name=~\"pipeline.transcribe|pipeline.translate|pipeline.index|pipeline.publish\"}[2m])))",
                     "seriesNameFormat": "{{otel_span_name}}"
                   }
                 }
