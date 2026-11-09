@@ -2,7 +2,7 @@
 
 ## Rehearse with two phones
 
-- Start the sample replay from the speaker console. Both phones wait for the speaker and follow the same caption timeline.
+- For live voice, leave **Live microphone** selected and press **Start talk** on the speaker console. For the seeded Q&A rehearsal, select **Sample replay**. Both phones follow the same room.
 - Reload one phone during playback to check catch-up. Hold the speaker's end control for three seconds and check that both phones finish on the same caption after the five-second drain.
 
 Open `/?room=demoen` on both phones and `/speaker?room=demoen` on the speaker's screen. All three devices must use the same server and room code. For a fresh queue, choose another six-character code made of lowercase letters or digits. Start the talk on the speaker's screen. When the second sample caption appears (12:04 on screen, ten seconds into playback), both phones have the citation for the Q&A rehearsal.

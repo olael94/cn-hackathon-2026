@@ -2,12 +2,14 @@ import { AudioLines, Mic, MicOff, Radio, Square } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { recordVoice, voiceFormat } from '@/api/voice'
 
 type SpeakerProps = {
   phase: 'waiting' | 'live' | 'draining' | 'ended'
   ready: boolean
   controlError: string | null
-  onStart: (save: boolean) => Promise<void>
+  voiceId?: string | null
+  onStart: (save: boolean, voice: boolean) => Promise<string | null>
   onStop: () => void
   onReset: () => void
 }
@@ -108,21 +110,26 @@ function micError(error: unknown) {
 export default function SpeakerConsole({
   phase,
   ready,
+  voiceId,
   controlError,
   onStart,
   onStop,
   onReset,
 }: SpeakerProps) {
   const [save, setSave] = useState(false)
+  const [voice, setVoice] = useState(true)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const [micActive, setMicActive] = useState(false)
   const [previousPhase, setPreviousPhase] = useState(phase)
   const stream = useRef<MediaStream | null>(null)
+  const stopRecorder = useRef<(() => Promise<void>) | null>(null)
   const request = useRef(0)
   const phaseRef = useRef(phase)
   const releaseMic = useCallback(() => {
     request.current += 1
+    void stopRecorder.current?.()
+    stopRecorder.current = null
     stopTracks(stream.current)
     stream.current = null
   }, [])
@@ -161,6 +168,10 @@ export default function SpeakerConsole({
     setPending(true)
     setError('')
     try {
+      if ((phase === 'waiting' ? voice : voiceId) && !voiceFormat()) {
+        setError('This browser cannot record voice. Use Safari or Chrome.')
+        return
+      }
       if (!navigator.mediaDevices?.getUserMedia) {
         setError(
           'Open the speaker link over HTTPS or on localhost to use your microphone.',
@@ -191,23 +202,41 @@ export default function SpeakerConsole({
         },
         { once: true },
       )
-      setMicActive(true)
-      if (phase === 'waiting') {
-        try {
-          await onStart(save)
-        } catch {
+      const id = phase === 'waiting' ? await onStart(save, voice) : voiceId
+      if (request.current !== attempt) return
+      if (id) {
+        const stop = await recordVoice(media, id, message => {
           releaseMic()
           setMicActive(false)
           setPending(false)
-        }
+          setError(message)
+        })
+        if (request.current !== attempt) { void stop(); return }
+        stopRecorder.current = stop
       }
+      setMicActive(true)
     } catch (failure) {
       if (request.current === attempt) {
         console.error('Microphone access failed', failure)
-        setError(micError(failure))
+        releaseMic()
+        setPending(false)
+        setError(failure instanceof Error && !(failure instanceof DOMException) ? failure.message : micError(failure))
       }
     } finally {
       if (request.current === attempt) setPending(false)
+    }
+  }
+
+  async function finishTalk() {
+    setPending(true)
+    const uploads = stopRecorder.current?.()
+    releaseMic()
+    setMicActive(false)
+    try {
+      await uploads
+      onStop()
+    } finally {
+      setPending(false)
     }
   }
 
@@ -233,18 +262,28 @@ export default function SpeakerConsole({
           )}
           {phase === 'waiting' && 'Ready to start'}
           {phase === 'live' &&
-            (micActive ? 'Microphone active' : 'Microphone disconnected')}
+            (micActive ? (voiceId ? 'Capturing your voice' : 'Microphone active') : 'Microphone disconnected')}
           {phase === 'draining' && 'Finishing captions (5 s)'}
           {phase === 'ended' && 'Talk ended'}
         </div>
         {(phase === 'waiting' || phase === 'live') && (
           <p className="text-sm text-muted-foreground">
-            The demo checks your microphone locally and replays sample captions.
+            {(phase === 'waiting' ? voice : voiceId)
+              ? 'Speak in English. Your voice is sent for transcription and Spanish translation.'
+              : 'Replay the sample captions for this room.'}
           </p>
         )}
         {phase === 'waiting' && (
+          <label>Caption source{' '}
+            <select className="control" disabled={pending} value={voice ? 'voice' : 'sample'}
+              onChange={e => setVoice(e.target.value === 'voice')}>
+              <option value="voice">Live microphone</option><option value="sample">Sample replay</option>
+            </select>
+          </label>
+        )}
+        {phase === 'waiting' && (
           <label className="flex min-h-12 cursor-pointer items-center justify-between gap-4 border-y border-border py-3">
-            Save the demo transcript on this device
+            Save the transcript on this device
             <input
               type="checkbox"
               className="size-5 shrink-0 accent-primary"
@@ -269,7 +308,7 @@ export default function SpeakerConsole({
             {pending ? 'Waiting for microphone…' : startLabel}
           </Button>
         )}
-        {phase === 'live' && <HoldToStop onConfirm={onStop} disabled={!ready} />}
+        {phase === 'live' && <HoldToStop onConfirm={() => void finishTalk()} disabled={!ready || pending} />}
         {phase === 'ended' && (
           <Button
             variant="outline"

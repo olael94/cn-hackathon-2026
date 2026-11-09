@@ -22,10 +22,12 @@ export function Questions({
   model,
   speaker,
   segments,
+  liveVoice,
 }: {
   model: ReturnType<typeof useQuestions>
   speaker: boolean
   segments: readonly Segment[]
+  liveVoice: boolean
 }) {
   const heading = useId()
   const input = useId()
@@ -74,7 +76,7 @@ export function Questions({
       action,
       action === 'ask' ? undefined : (route.target ?? undefined),
       draft.trim(),
-      route.segment ?? undefined,
+      liveVoice ? undefined : route.segment ?? undefined,
     )
   }
 
@@ -152,7 +154,7 @@ export function Questions({
       )}
       <ol className="qa-list">
         {filtered.map((group) => {
-          const evidence = captions.find((line) => line.id === group.segment)
+          const evidence = !liveVoice && captions.find((line) => line.id === group.segment)
           return (
             <li key={group.id}>
               <div className="qa-copy">

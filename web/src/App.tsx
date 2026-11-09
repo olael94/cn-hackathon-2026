@@ -122,7 +122,7 @@ function Header({ room, speaker }: { room: Room; speaker: boolean }) {
             <Brand />
           </a>
           <div className="head-location">
-            <span>Demo room</span>
+            <span>Room {demoRoom}</span>
             <ChevronRight size={13} />
             <b>{speaker ? 'Speaker' : 'Attendee'}</b>
           </div>
@@ -154,7 +154,7 @@ function CaptionFeed({ room, language }: { room: Room; language: Language }) {
           <Captions />
           Caption stream
         </h2>
-        <span className="meta">Sample replay · {language === 'en' ? 'English' : 'Spanish'}</span>
+        <span className="meta">{room.phase !== 'waiting' && (room.voiceId ? 'Speaker voice · ' : 'Sample replay · ')}{language === 'en' ? 'English' : 'Spanish'}</span>
       </div>
       <div role="log" aria-live="polite" aria-relevant="additions text">
         {current ? (
@@ -169,7 +169,8 @@ function CaptionFeed({ room, language }: { room: Room; language: Language }) {
                 {current.id.toString().padStart(3, '0')}
               </span>
             </div>
-            <p className="main-line" lang={language}>
+            {language === 'es' && 'translationMissing' in current && current.translationMissing === true && <small>Spanish translation unavailable</small>}
+            <p className="main-line" lang={language === 'es' && 'translationMissing' in current && current.translationMissing ? 'en' : language}>
               {current[language]}
             </p>
           </article>
@@ -200,7 +201,8 @@ function CaptionFeed({ room, language }: { room: Room; language: Language }) {
                     <small>#{line.id.toString().padStart(3, '0')}</small>
                   </div>
                   <div>
-                    <p className="history-primary" lang={language}>
+                    {language === 'es' && 'translationMissing' in line && line.translationMissing === true && <small>Spanish translation unavailable</small>}
+                    <p className="history-primary" lang={language === 'es' && 'translationMissing' in line && line.translationMissing ? 'en' : language}>
                       {line[language]}
                     </p>
                   </div>
@@ -222,7 +224,7 @@ function SignalMonitor({ room }: { room: Room }) {
           <Activity />
           Caption delay
         </h2>
-        <span className="meta">REPLAY</span>
+        <span className="meta">{room.voiceId ? 'VOICE' : 'REPLAY'}</span>
       </div>
       <div className="signal-body">
         <div>
@@ -236,19 +238,19 @@ function SignalMonitor({ room }: { room: Room }) {
           viewBox="0 0 140 44"
           width="140"
           height="44"
-          aria-label="Delay of recent sample captions"
+          aria-label="Delay of recent captions"
           role="img"
         >
           <path d="M0 13H140" stroke="var(--border)" strokeDasharray="3 4" />
-          {room.visible.map((line, i) => (
+          {room.visible.slice(-7).map((line, i, lines) => (
             <rect
               key={line.id}
               x={i * 19 + 3}
-              y={43 - line.lag * 3}
+              y={43 - Math.min(43, line.lag * 3)}
               width="12"
-              height={line.lag * 3}
+              height={Math.min(43, line.lag * 3)}
               fill={
-                i === room.visible.length - 1
+                i === lines.length - 1
                   ? 'var(--primary)'
                   : 'var(--muted-foreground)'
               }
@@ -340,6 +342,7 @@ export default function App() {
             {speaker && (
               <SpeakerConsole
                 phase={room.phase}
+                voiceId={room.voiceId}
                 ready={room.ready}
                 controlError={room.controlError}
                 onStart={room.start}
@@ -363,7 +366,8 @@ export default function App() {
               <QuestionsPanel
                 model={questions}
                 speaker={speaker}
-                segments={room.visible}
+                segments={room.voiceId ? [] : room.visible}
+                liveVoice={Boolean(room.voiceId)}
               />
             </div>
             <SignalMonitor room={room} />
@@ -371,7 +375,7 @@ export default function App() {
         </div>
         <footer className="session-footer">
           <span>
-            <Radio size={14} /> Demo replay · sample captions
+            <Radio size={14} /> {room.phase === 'waiting' ? 'Waiting for speaker' : room.voiceId ? 'Live voice captions' : 'Sample caption replay'}
           </span>
           <span>
             Room service{' '}

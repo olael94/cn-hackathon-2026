@@ -5,15 +5,16 @@ import { demoPath, demoRoom, newId } from '@/api/demo'
 
 const schema = z.object({
   revision: z.number().int(),
+  voice_id: z.string().nullable().optional(),
   started_ms: z.number().nullable(),
   stopped_ms: z.number().nullable(),
   server_ms: z.number(),
 }) satisfies z.ZodType<DemoReplay>
 const key = ['demo-replay', demoRoom]
-type Action = 'start' | 'stop' | 'reset'
+type Action = 'start' | 'voice' | 'stop' | 'reset'
 let token: string | undefined
 
-function speakerToken() {
+export function speakerToken() {
   if (!token) {
     const storageKey = 'roompass:demo:speaker'
     try {
@@ -32,6 +33,7 @@ async function request(suffix: string, options: RequestInit) {
   if (!response.ok) {
     if (response.status === 403) throw new Error('Use the speaker browser that started this replay.')
     if (response.status === 409) throw new Error('The room changed. Check its status and try again.')
+    if (response.status === 503) throw new Error('The live caption service is unavailable. Try again or select Sample replay.')
     throw new Error('Could not update the room. Check your connection and try again.')
   }
   const state = schema.parse(await response.json())
@@ -49,7 +51,8 @@ export function useReplay() {
   })
   const control = useMutation({
     networkMode: 'always',
-    mutationFn: (action: Action) => request('/' + action + '?revision=' + state.data?.revision, {
+    mutationFn: (action: Action) => request('/' + (action === 'voice' ? 'start' : action)
+      + '?revision=' + state.data?.revision + (action === 'voice' ? '&voice=true' : ''), {
       method: 'POST',
       headers: { 'X-Speaker-Token': speakerToken() },
     }),

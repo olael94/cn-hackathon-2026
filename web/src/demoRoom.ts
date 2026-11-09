@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { demoRoom } from '@/api/demo'
 import { useReplay } from '@/api/replay'
+import { useVoiceCaptions } from '@/api/voice'
 
 export const captions = [
   {
@@ -63,6 +64,8 @@ export function useDemoRoom(speaker: boolean, language: 'en' | 'es') {
     try { return localStorage.getItem(transcriptKey) } catch { return null }
   })
   const session = state.data
+  const voiceId = session?.voice_id
+  const feed = useVoiceCaptions(voiceId)
   const disconnected = state.isError || state.fetchStatus === 'paused'
   const now = session
     ? session.server_ms + Math.max(0, clockTick - session.anchor)
@@ -74,7 +77,13 @@ export function useDemoRoom(speaker: boolean, language: 'en' | 'es') {
     : finish === null ? 'live' : now < finish ? 'draining' : 'ended'
   const until = Math.min(now, finish ?? Infinity)
   const count = started === null ? 0 : Math.max(0, 1 + Math.floor((until - started - 2000) / 8000))
-  const visible = captions.slice(0, count)
+  const visible = voiceId ? (feed?.lines ?? []).map(line => ({
+    id: line.seq,
+    time: new Date(Math.floor(line.t_end) * 1000).toISOString().slice(11, 19),
+    en: line.text_en, es: line.text_es ?? line.text_en,
+    translationMissing: !line.text_es,
+    lag: Math.max(0, (Date.parse(line.emitted_at) - (started ?? 0)) / 1000 - line.t_end),
+  })) : captions.slice(0, count)
   const nextCaption = started !== null && count < captions.length ? started + 2000 + count * 8000 : Infinity
   const nextChange = Math.min(nextCaption, finish !== null && now < finish ? finish : Infinity)
   useEffect(() => {
@@ -89,21 +98,23 @@ export function useDemoRoom(speaker: boolean, language: 'en' | 'es') {
     : phase === 'waiting' ? 'Waiting for speaker'
     : phase === 'draining' ? 'Finishing captions'
     : phase === 'ended' ? 'Talk ended'
+    : voiceId ? (!feed?.connected ? 'Connecting to captions' : visible.length ? null : 'Listening for speech')
     : !count ? 'Waiting for first caption'
     : now >= (started ?? 0) + 2000 + captions.length * 8000 ? 'Sample complete'
     : null
 
-  async function start(save: boolean) {
-    const next = await control.mutateAsync('start')
+  async function start(save: boolean, voice: boolean) {
+    const next = await control.mutateAsync(voice ? 'voice' : 'start')
     const value = save ? String(next.started_ms) : null
     setSavedStart(value)
     try {
       if (value) localStorage.setItem(transcriptKey, value)
       else localStorage.removeItem(transcriptKey)
     } catch { /* The download stays available during this visit. */ }
+    return next.voice_id ?? null
   }
   return {
-    phase, visible, badge, latest: visible.at(-1), start,
+    voiceId, phase, visible, badge, latest: visible.at(-1), start,
     ready: Boolean(session) && !disconnected && !control.isPending,
     controlError: control.isError
       ? (control.error instanceof TypeError ? 'Could not reach the room. Check your connection and try again.' : control.error.message)

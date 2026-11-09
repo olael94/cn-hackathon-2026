@@ -325,6 +325,10 @@ async def gap_check(state: TalkState) -> None:
 
 @router.post("/talks")
 async def create_talk(body: CreateTalkRequest) -> CreateTalkResponse:
+    return await provision_talk(body, secrets.token_urlsafe(24))
+
+
+async def provision_talk(body: CreateTalkRequest, token: str) -> CreateTalkResponse:
     talk = Talk(
         talk_id=new_talk_id(),
         title=body.title,
@@ -334,7 +338,6 @@ async def create_talk(body: CreateTalkRequest) -> CreateTalkResponse:
         started_at=None,
         ended_at=None,
     )
-    token = secrets.token_urlsafe(24)
     state = TalkState(talk=talk, token_hash=hash_token(token))
     await search.save_talk(talk, state.token_hash)
     talks[talk.talk_id] = state
@@ -344,6 +347,20 @@ async def create_talk(body: CreateTalkRequest) -> CreateTalkResponse:
 @router.get("/talks/{talk_id}")
 async def get_talk(talk_id: str) -> Talk:
     return (await load_state(talk_id)).talk
+
+
+@router.get("/talks/{talk_id}/capture")
+async def capture_position(
+    talk_id: str, x_speaker_token: Annotated[str | None, Header()] = None
+) -> dict[str, float | int]:
+    state = await load_state(talk_id)
+    require_speaker(state, x_speaker_token)
+    if state.talk.status != "live" or not state.talk.started_at:
+        raise HTTPException(409, "Voice capture has ended.")
+    return {
+        "seq": max([state.next_publish - 1, *state.arrived_at, *state.done]) + 1,
+        "elapsed": (now_utc() - state.talk.started_at).total_seconds(),
+    }
 
 
 @router.post("/talks/{talk_id}/start")
@@ -381,8 +398,12 @@ async def upload_audio(
     require_speaker(state, x_speaker_token)
     if state.talk.status != "live":
         raise HTTPException(status_code=409, detail="Talk is not live")
-    audio = await file.read()
-    if seq < state.next_publish:  # already published or skipped: discard (CONTRACT.md)
+    if not (0 <= seq <= state.next_publish + 300 and 0 <= t_start < t_end):
+        raise HTTPException(422, "Invalid voice chunk position.")
+    audio = await file.read(2_000_001)
+    if not audio or len(audio) > 2_000_000:
+        raise HTTPException(413, "Invalid voice chunk size.")
+    if seq < state.next_publish or seq in state.arrived_at:
         return AudioAccepted(seq=seq)
     state.arrived_at.setdefault(seq, time.monotonic())
     # Answer the speaker page right away; the work runs in the background.

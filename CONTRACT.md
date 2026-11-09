@@ -132,6 +132,8 @@ The 4 or 5 themes that cover most of the questions, for the speaker to answer in
 
 ## Endpoints
 
+The room controller accepts `voice=true` on the demo start endpoint. It provisions and starts a live talk, returning its public `voice_id` in the room snapshot. Attendees subscribe to that talk’s SSE stream. The room owner sends the same private speaker token for capture and audio uploads. `GET /api/talks/{talk_id}/capture` returns the next sequence number and the elapsed seconds for connecting or resuming a microphone. Audio uploads accept independently decodable WebM/Opus or MP4 chunks.
+
 The sample caption replay uses `GET /api/demo/{room}/replay` and returns `DemoReplay`. The revision starts at zero. Times are Unix milliseconds from the same server clock. A null start means waiting. The first sample arrives two seconds after start and subsequent samples every eight seconds. The replay freezes five seconds after stop.
 
 The demo speaker sends `POST /api/demo/{room}/replay/{start|stop|reset}?revision=N` with its private browser-generated UUID in `X-Speaker-Token`. The first start claims the replay for that browser until reset. Each successful change increments the revision and returns the new snapshot. A competing speaker receives 403, and an out-of-date revision or invalid transition receives 409. Reading the snapshot requires no token.

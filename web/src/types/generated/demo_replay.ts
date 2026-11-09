@@ -6,6 +6,7 @@
  */
 
 export interface DemoReplay {
+  voice_id?: string | null;
   revision: number;
   server_ms: number;
   started_ms: number | null;

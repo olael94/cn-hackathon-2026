@@ -10,6 +10,7 @@ class DemoReplay(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
+    voice_id: str | None = None
     revision: conint(ge=0)
     server_ms: int
     started_ms: int | None
