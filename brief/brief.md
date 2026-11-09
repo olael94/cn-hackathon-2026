@@ -60,7 +60,10 @@ Must ship:
 
 **Must have (demo path):** the four requirements in §6.
 
-**Nice to have:** Catch me up: 3 to 5 bullets on the talk so far, each linked to its caption line. Question filter on phones.
+**Nice to have:**
+- Catch me up: 3 to 5 bullets on the talk so far, each linked to its caption line.
+- Question themes (after catch up): the questions grouped into 4 or 5 themes so the speaker can answer most of them, with off-topic questions left out. It adds to the question list, it does not replace it.
+- Question filter on phones.
 
 **Out of scope:** Redis, flagd and the chaos flag, OPUS-MT and Moonshine, WebSocket audio, 15 s passages, transcript opt-in switch, follow-a-talk, end-of-talk summary, EN/ES question merge, edge mode, join-code rotation, TTL deletion, chatbot, more than 2 languages, accounts, notifications, schedules, sign language, recordings.
 
@@ -74,13 +77,14 @@ Must ship:
 
 ## 10. AI approach
 
-AI transcribes and translates, both with OpenAI models (check exact names in the OpenAI dashboard). It never decides what is true. "Possibly covered" is Elasticsearch search, no generation. Catch-up bullets (stretch, structured outputs) must cite existing segment IDs, or code drops them.
+AI transcribes and translates, both with OpenAI models (check exact names in the OpenAI dashboard). It never decides what is true. "Possibly covered" is Elasticsearch search, no generation. Catch-up bullets (stretch, structured outputs) must cite existing segment IDs, or code drops them. Question themes: Elasticsearch scores and plain code decide what is on topic and what groups together; a model only writes each theme's label, which must cite that theme's question IDs, or code falls back to the top question.
 
 ## 11. Glossary
 
 - **Segment:** one finished caption line from one 5 s audio chunk, with `t_start`, `t_end`, `text_en`, `text_es`. Also the unit for semantic matching.
 - **Lag:** phone receive time minus (talk `started_at` + segment `t_end`), corrected with the SSE hello clock offset. SLO: p95 under 10 s.
 - **Soft match:** "Possibly covered" shown only when the top match is a keyword hit with a semantic score of at least 0.6, or has a semantic score of at least 0.8 (`CONTRACT.md`).
+- **Theme:** a group of related on-topic questions with one label, ranked by total votes.
 
 ## 12. Open questions
 

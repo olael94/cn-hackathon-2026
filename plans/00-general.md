@@ -22,7 +22,8 @@
 | 02 | Backend lane: audio upload, OpenAI transcription + translation, Elasticsearch, SSE, Q&A check, catch-up | Oliver | | 03, 04 | 3:15 to 4:30 PM | |
 | 03 | Web lane: phone page, speaker view, accessibility | Frontend | | 02, 04 | 3:15 to 4:30 PM | |
 | 04 | Platform lane: Secrets, Dash0 traces + RUM + lag SLO, Radar audit, real incident, PR check workflow | Miguel | | 02, 03 | 3:15 to 4:30 PM | |
-| 05 | Freeze, rehearse, backup video, README, submit | All 3 | | Split by owner | 4:45 to 5:30 PM | |
+| 05 | Stretch: question themes (`backend/roompass/themes/`) | Miguel | | 02, 03 | 4:00 to 4:30 PM, only if captions and Q&A work | |
+| 06 | Freeze, rehearse, backup video, README, submit | All 3 | | Split by owner | 4:45 to 5:30 PM | |
 
 ### Sync points (all three lanes meet, nobody moves on until it works)
 
@@ -36,7 +37,7 @@
 
 ## Parallel work: encouraged
 
-- **One lane, one folder set, one branch.** Backend: `backend/roompass/` (except `generated/`). Web: `web/src/` (except `types/generated/`). Platform: `deploy/`, `.github/`, `.gitar/`, `docs/tools/`.
+- **One lane, one folder set, one branch.** Backend: `backend/roompass/` (except `generated/`, `contract.py` and `themes/`). Themes: `backend/roompass/themes/`. Web: `web/src/` (except `types/generated/`). Platform: `deploy/`, `.github/`, `.gitar/`, `docs/tools/`.
 - **Build against the contract, not each other.**
   - Web builds against a fake SSE stream that replays the seeded segments from `schema/examples/`.
   - Backend tests on the recorded 3-minute test talk with `curl`.
@@ -68,4 +69,4 @@ Copied from the brief's "Must ship".
 - **Tests beyond two:** only the citation validator and a quick captions-path check.
 - **Judges scanning the QR as part of the demo:** bonus only. The demo runs on our phones.
 
-**Cut order if late:** catch me up, then the question filter, then vote counts. Never captions, the Q&A match or the ops story.
+**Cut order if late:** question themes, then catch me up, then the question filter, then vote counts. Never captions, the Q&A match or the ops story.
