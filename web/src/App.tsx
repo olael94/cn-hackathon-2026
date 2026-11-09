@@ -110,9 +110,9 @@ function Header({ room, speaker }: { room: Room; speaker: boolean }) {
   const lag = room.latest?.lag ?? 0
   const level = room.badge
     ? 'idle'
-    : lag > 3
+    : lag > 10
       ? 'delayed'
-      : lag > 2
+      : lag > 6
         ? 'warning'
         : 'healthy'
   return (
@@ -130,7 +130,7 @@ function Header({ room, speaker }: { room: Room; speaker: boolean }) {
           <div className="head-status mono" role="status">
             <i />
             {room.badge ??
-              `${lag > 3 ? 'LAG' : 'LIVE'} · ${lag.toFixed(1)}s behind`}
+              `${level === 'delayed' ? 'LAG' : 'LIVE'} · ${lag.toFixed(1)}s behind`}
           </div>
         </div>
       </header>
@@ -139,7 +139,7 @@ function Header({ room, speaker }: { room: Room; speaker: boolean }) {
           <span>
             <CircleHelp size={14} /> Machine captions · may contain errors
           </span>
-          <span className="meta">Target: p95 &lt; 3.0s</span>
+          <span className="meta">Target: p95 &lt; 10s</span>
         </div>
       </div>
     </>
@@ -218,12 +218,6 @@ function CaptionFeed({ room, language }: { room: Room; language: Language }) {
           </ol>
         </>
       )}
-      {room.partial && (
-        <div className="partial">
-          <span className="meta">Live audio · EN</span>
-          <p lang="en">{room.partial}…</p>
-        </div>
-      )}
       {room.ended && room.preview && (
         <Button className="control" variant="outline" onClick={room.replay}>
           <RotateCcw />
@@ -260,14 +254,14 @@ function SignalMonitor({ room }: { room: Room }) {
           aria-label="Delay of recent sample captions"
           role="img"
         >
-          <path d="M0 22H140" stroke="var(--border)" strokeDasharray="3 4" />
+          <path d="M0 13H140" stroke="var(--border)" strokeDasharray="3 4" />
           {room.visible.map((line, i) => (
             <rect
               key={line.id}
               x={i * 19 + 3}
-              y={43 - line.lag * 7}
+              y={43 - line.lag * 3}
               width="12"
-              height={line.lag * 7}
+              height={line.lag * 3}
               fill={
                 i === room.visible.length - 1
                   ? 'var(--primary)'

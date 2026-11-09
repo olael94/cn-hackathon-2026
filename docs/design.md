@@ -14,7 +14,7 @@
    - Use crisp `1px solid` or `2px solid` borders for hierarchy.
    - Maximum border radius is `4px` (`--radius: 4px`) for buttons/inputs and `0px` or `4px` for structural cards. Never use pill-shaped cards (`rounded-2xl` / `rounded-3xl`).
 3. **Tabular Numerals Everywhere:**
-   - Every timestamp (`12:04`), segment ID (`#042`), lag readout (`live · 1.4s behind`), similarity score (`0.89`), vote count, and countdown timer MUST use `--font-mono` with `font-variant-numeric: tabular-nums` so numbers never jitter horizontally during live updates.
+   - Every timestamp (`12:04`), segment ID (`#042`), lag readout (`live · 6.2s behind`), similarity score (`0.89`), vote count, and countdown timer MUST use `--font-mono` with `font-variant-numeric: tabular-nums` so numbers never jitter horizontally during live updates.
 4. **Use the existing web stack:**
    - Build in `web/` (Vite, React, strict TypeScript, Tailwind, shadcn/ui). Do not add a second static frontend or serve HTML from FastAPI.
    - Map the tokens in section 2 onto the shadcn CSS variables in `web/src/index.css` (see the token map below). Register the extra tokens in `@theme inline` as `--color-<name>` so Tailwind classes like `border-ok` and `bg-danger-tint` work.
@@ -60,11 +60,11 @@ RoomPass defaults to **Swiss Civic Obsidian** (`data-theme="swiss"`), engineered
   --accent: #FFBE0B;           /* Safety Amber */
   --accent-ink: #000000;       /* Text on Amber buttons */
   --accent-tint: #261C00;
-  --ok: #00F5D4;               /* Telemetry Healthy (< 2.0s) */
+  --ok: #00F5D4;               /* Telemetry Healthy (<= 6s) */
   --ok-tint: #002924;
-  --warn: #FB5607;             /* Telemetry Warning (2.0s - 3.0s) */
+  --warn: #FB5607;             /* Telemetry Warning (6s - 10s) */
   --warn-tint: #2E1000;
-  --danger: #FF006E;           /* Chaos / SLO Burn (> 3.0s) */
+  --danger: #FF006E;           /* Delayed segment (> 10s) */
   --danger-tint: #330016;
   --status-color: var(--text-muted);
 }
@@ -156,17 +156,17 @@ Use the talk lifecycle and the existing SSE connection to drive a single status 
 | What the attendee is experiencing | Badge and caption feed |
 |---|---|
 | The speaker has not started | Show `Waiting for speaker`. |
-| The talk has started | Show `Waiting for first caption` until the first live, finalized segment arrives. Partials can appear immediately. |
+| The talk has started | Show `Waiting for first caption` until the first live, finalized segment arrives. |
 | Live captions are arriving | Show the delay of the latest live, finalized segment using the thresholds below. |
 | The connection drops or missed segments are replaying | Replace the entire lag readout with `Reconnecting`. Keep the transcript visible, resume from the last event ID and append missed segments once. Restore the lag readout on the first new live segment after replay. |
 | The talk has ended | After the five-second drain, show `Talk ended` and leave the final captions readable. |
 
 - **Formula:** `lag = phone_receive_time - (started_at + t_end) + clock_offset` (from SSE `hello` event).
 - **Visual States:**
-  - `lag <= 2.0s`: Healthy (`--ok` border & dot, text: `LIVE · 1.4s behind`)
-  - `2.0s < lag <= 3.0s`: Degrading (`--warn` border & dot, text: `LIVE · 2.6s behind`)
-  - `lag > 3.0s`: Delayed segment (`--danger` border, `--danger-tint` background, text: `LAG · 4.8s behind`)
-- Dash0 evaluates the aggregate objective of p95 below 3.0 seconds across live segment measurements. The phone badge reports one segment. Exclude reconnect replay from live latency measurements.
+  - `lag <= 6s`: Healthy (`--ok` border & dot, text: `LIVE · 5.2s behind`)
+  - `6s < lag <= 10s`: Degrading (`--warn` border & dot, text: `LIVE · 8.1s behind`)
+  - `lag > 10s`: Delayed segment (`--danger` border, `--danger-tint` background, text: `LAG · 12.4s behind`)
+- Dash0 evaluates the aggregate objective of p95 below 10 seconds across live segment measurements. The badge reports one segment. Exclude reconnect replay from live latency measurements.
 - **Required Disclaimer:** Always show `"Machine captions · may contain errors"` directly below the header.
 
 ```html
@@ -178,22 +178,24 @@ Use the talk lifecycle and the existing SSE connection to drive a single status 
   <!-- Example after a live segment. Use the state table above for other badge labels. -->
   <div id="slo-badge" class="mono" role="status" aria-live="polite" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; background:var(--ok-tint); border:2px solid var(--ok); color:var(--text); font-size:12px; font-weight:700; border-radius:var(--radius);">
     <span id="slo-dot" style="width:8px; height:8px; background:var(--ok); display:inline-block;"></span>
-    <span id="slo-text">LIVE · 1.4s behind</span>
+    <span id="slo-text">LIVE · 5.2s behind</span>
   </div>
 </header>
 
 <div class="mono" style="display:flex; justify-content:space-between; padding:6px 14px; background:var(--surface-raised); border-bottom:1px solid var(--border); font-size:11px; color:var(--text-muted);">
   <span>MACHINE CAPTIONS · MAY CONTAIN ERRORS</span>
-  <span>Target: p95 &lt; 3.0s</span>
+  <span>Target: p95 &lt; 10s</span>
 </div>
 ```
 
-### 4.2 Bilingual Caption Stream (`partial` vs `segment`)
+### 4.2 Bilingual caption stream
+
+Render finalized `segment` events from the five-second audio chunks specified in CONTRACT.md.
+
 - **Layout:** Single-column vertical feed with `padding-bottom: 96px` so the sticky bottom thumb bar never obscures the active caption line.
 - **Language Selection:**
   - Primary language selected by user (`EN` or `ES`) renders at `font-size: var(--caption-size); font-weight: 700; color: var(--text)`.
   - Secondary language renders directly underneath at `font-size: calc(var(--caption-size) * 0.78); color: var(--text-muted)`.
-- **SSE `partial` Event:** Renders in a fixed-position or bottom-anchored dashed box (`border: 1px dashed var(--border-strong)`). Replaces itself in place until the finalized `segment` arrives.
 
 ```html
 <main id="caption-stream" role="log" aria-live="polite" aria-label="Live captions" style="padding:16px 14px 96px 14px; display:flex; flex-direction:column; gap:18px;">
@@ -202,10 +204,10 @@ Use the talk lifecycle and the existing SSE connection to drive a single status 
   <article data-segment-id="seg-041" style="padding-left:12px; border-left:2px solid var(--border);">
     <div class="mono" style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">12:04 · #041</div>
     <p style="margin:0; font-size:var(--caption-size); line-height:1.4; font-weight:700;">
-      Los teléfonos se reconectan con SSE Last-Event-ID y recuperan datos de Redis Streams.
+      El autoescalado solo ayuda si tus solicitudes están bien configuradas.
     </p>
     <p style="margin:4px 0 0 0; font-size:calc(var(--caption-size) * 0.78); line-height:1.35; color:var(--text-muted);">
-      Phones resume with SSE Last-Event-ID and backfill from Redis Streams.
+      Autoscaling only helps if your requests are set correctly.
     </p>
   </article>
 
@@ -219,14 +221,6 @@ Use the talk lifecycle and the existing SSE connection to drive a single status 
       If the translator restarts, no in-flight message is lost.
     </p>
   </article>
-
-  <!-- In-Flight Partial (EN only, replaces itself) -->
-  <div id="partial-box" style="padding:10px 12px; background:var(--surface); border:1px dashed var(--border-strong); border-radius:var(--radius);">
-    <div class="mono" style="font-size:10px; color:var(--accent); text-transform:uppercase; margin-bottom:2px;">LIVE AUDIO (EN)...</div>
-    <p id="partial-text" style="margin:0; font-size:calc(var(--caption-size) * 0.9); color:var(--text-muted);">
-      And when we trigger the delay flag through OpenFeature...
-    </p>
-  </div>
 
 </main>
 ```
@@ -245,7 +239,7 @@ Keep the draft available if posting fails. Show the room's questions in descendi
 - **Required Elements:**
   1. Timestamp (`Possibly covered at 12:04`)
   2. Exact matched caption line (`text_en` or `text_es`)
-  3. Raw cosine match score (`MATCH: 0.89`)
+  3. Semantic match score (see CONTRACT.md, Match) (`MATCH: 0.89`)
   4. **`Still ask`** override button (must always be available so the user is never blocked).
 
 ```html
@@ -260,7 +254,7 @@ Keep the draft available if posting fails. Show the room's questions in descendi
       <span>SCORE: 0.89</span>
     </div>
     <blockquote style="margin:0; font-size:14px; line-height:1.4; color:var(--text);">
-      "Phones resume with SSE Last-Event-ID and backfill from Redis Streams."
+      "Autoscaling only helps if your requests are set correctly."
     </blockquote>
   </div>
 
@@ -357,8 +351,8 @@ const statusLabels = {
 }
 
 export function lagLevel(lagSeconds: number): LagLevel {
-  if (lagSeconds > 3.0) return 'danger'
-  if (lagSeconds > 2.0) return 'warn'
+  if (lagSeconds > 10) return 'danger'
+  if (lagSeconds > 6) return 'warn'
   return 'ok'
 }
 
@@ -548,7 +542,7 @@ Before opening a pull request touching `phone` or `speaker` frontend files, veri
 - [ ] Try a short tap and short Space and Enter presses. Release early, move focus or switch windows during a hold. Each cancellation resets progress and leaves the talk live. In separate runs, hold with the pointer, Space and Enter for three seconds each. Each run produces one stop, displays the five-second drain, receives final captions and shows Talk ended.
 - [ ] Post an unmatched question and verify the confirmation and list entry. For a Spanish question matching English captions, verify the timestamp, exact quote and score. Dismiss it and verify the list is unchanged. Repeat with Still ask and verify it appears once, with English above the original Spanish on the speaker console.
 - [ ] Vote for a question and try voting for it again on the same device. Verify one increment and descending vote order on both views. Exercise the attendee filter if retained for the demo.
-- [ ] Join before start, then start the talk. Check both waiting labels and that the first finalized live caption supplies the first lag value. Verify the badge at 2.0 s, at 3.0 s and above 3.0 s. Disconnect and reconnect with missed captions. Reconnecting replaces the stale value through replay. The first subsequent live segment restores the readout. Check the aggregate p95 separately in Dash0.
+- [ ] Join before start, then start the talk. Check both waiting labels and that the first finalized live caption supplies the first lag value. Verify the badge at 6 s, at 10 s and above 10 s. Disconnect and reconnect with missed captions. Reconnecting replaces the stale value through replay. The first subsequent live segment restores the readout. Check the aggregate p95 separately in Dash0.
 - [ ] Measure stop text contrast in both themes against the idle background and the progress fill. The instruction and countdown must each reach 7:1 throughout the hold.
 - [ ] Zero gradients, blurs, rounded pills (`> 4px`), or sparkle icons exist in the diff.
 - [ ] All numeric indicators (`t_start`, `lag`, `score`, `votes`, countdowns) have the `.mono` class with `font-variant-numeric: tabular-nums`.

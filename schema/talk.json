@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Talk",
+  "type": "object",
+  "properties": {
+    "talk_id": { "type": "string", "pattern": "^[a-z0-9]{6}$" },
+    "title": { "type": "string" },
+    "speaker_name": { "type": "string" },
+    "room": { "type": "string" },
+    "status": { "type": "string", "enum": ["waiting", "live", "ended"] },
+    "started_at": { "type": ["string", "null"], "format": "date-time" },
+    "ended_at": { "type": ["string", "null"], "format": "date-time" }
+  },
+  "required": ["talk_id", "title", "speaker_name", "room", "status", "started_at", "ended_at"],
+  "additionalProperties": false
+}

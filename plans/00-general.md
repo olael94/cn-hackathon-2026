@@ -1,84 +1,72 @@
 # General Plan
 
-**Source:** `brief/brief.md`, filled from `docs/RoomPass Brief.md` (Brief v2).
+**Source:** `brief/brief.md` (cut-down) and `CONTRACT.md`. `CONTRACT.md` wins wherever they disagree.
 
-**Demo path (one sentence):** Miguel speaks English, our phones show Spanish captions with "live · 1.4s behind", a Spanish question comes back "Possibly covered at 12:04" with the English line and score, then a chaos flag pushes lag up, Dash0 and Radar point at the translator, and the fallback flag brings it back in seconds.
+**Demo path (one sentence):** Miguel speaks English, our phones show Spanish captions with "live · 6.2s behind", a Spanish question comes back "Possibly covered at 12:04" with the English line and score, then Dash0 shows that caption's trace and the lag SLO, and we tell the real incident from today.
 
-**Wow moment:** demo beats 2 to 4 in the brief: live EN to ES captions with visible lag, a cross-language Q&A match, and one real ops incident fixed by a flag flip.
+**Wow moment:** demo beats 2 to 4 in the brief: live EN to ES captions with visible lag, a cross-language Q&A match, and one real incident found with Dash0 or Radar and fixed through a PR.
 
 ## Assumptions
 
-- The brief's "one Python image, three processes" lives in `backend/` as package `roompass` (`python -m roompass api | pipeline | translator`), one image, three Deployments. The phone page and speaker view live in `web/` (static Vite build with Dash0 RUM), as set up in PR #4.
+- One backend process: `python -m roompass api` runs the api, the audio pipeline and the SSE fan-out together, 1 replica, `strategy: Recreate`. The `pipeline` and `translator` entries in `__main__.py` stay unused.
+- The phone page and speaker view live in `web/` (static Vite build with Dash0 RUM), as set up in PR #4.
 - TLS is already solved: the platform serves `https://the-mok-team.cnh.radarhq.io` to Service `app`. The speaker mic works on that URL.
-- The brief's "Must ship" list is the hard requirements list (`brief/brief.md` §6).
+- Shapes are JSON Schema in `schema/`, generated into both sides by `scripts/gen-types.sh`.
 
 ## Phases
 
-| # | Phase | Owner | Blocking? | Parallel with | Plan file | Target | Status |
-|---|-------|-------|-----------|---------------|-----------|--------|--------|
-| 00 | Monorepo scaffold: `web/` + `backend/`, two images, CI | Platform | Yes | | | | Done (PR #4) |
-| 01 | Contract + seed data | All 3 | Yes | Nothing | `phase-01-contract.md` | H0, 20 min | |
-| 02 | Pipeline lane: audio in, STT, translator, flags hooks | Pipeline | | 03, 04 | `phase-02-pipeline.md` | H1 to H3 | |
-| 03 | App lane: api, Elasticsearch, Q&A match, phone page, speaker view | App | | 02, 04 | `phase-03-app.md` | H1 to H3 | |
-| 04 | Platform lane: cluster, Redis, flagd, Dash0, SLO, Gitar rules | Platform | | 02, 03 | `phase-04-platform.md` | H1 to H3 | |
-| 05 | Wow moment hardened: thresholds, chaos rehearsal, real incident | All 3 | | 06 | `phase-05-wow.md` | H4 | |
-| 06 | Stretch: catch me up | Pipeline | | 05 | `phase-06-catchup.md` | H4, only if 05 is on track | |
-| 07 | Last mile: audit, personas, polish, docs, backup video | All 3 | | Split by owner | `phase-07-last-mile.md` | H4.5 to H5 | |
+| # | Phase | Owner | Blocking? | Parallel with | Target | Status |
+|---|-------|-------|-----------|---------------|--------|--------|
+| 00 | Monorepo scaffold: `web/` + `backend/`, two images, CI | Platform | Yes | | | Done (PR #4) |
+| 01 | Contract: `CONTRACT.md`, Gitar rules, schemas + generated types | All 3 | Yes | Nothing | 3:15 PM | In progress (PR #6 merged) |
+| 02 | Backend lane: audio upload, OpenAI transcription + translation, Elasticsearch, SSE, Q&A check, catch-up | Oliver | | 03, 04 | 3:15 to 4:30 PM | |
+| 03 | Web lane: phone page, speaker view, accessibility | Frontend | | 02, 04 | 3:15 to 4:30 PM | |
+| 04 | Platform lane: Secrets, Dash0 traces + RUM + lag SLO, Radar audit, real incident, PR check workflow | Miguel | | 02, 03 | 3:15 to 4:30 PM | |
+| 05 | Stretch: question themes (`backend/roompass/themes/`) | Miguel | | 02, 03 | 4:00 to 4:30 PM, only if captions and Q&A work | |
+| 06 | Freeze, rehearse, backup video, README, submit | All 3 | | Split by owner | 4:45 to 5:30 PM | |
 
 ### Sync points (all three lanes meet, nobody moves on until it works)
 
 | When | Done means |
 |------|------------|
-| H1 | English captions from OpenAI realtime reach a phone through the cluster. OTel in Dash0. STT gate: stay on OpenAI. |
-| H2 | EN + ES captions on a phone from the public HTTPS URL. Test talk pre-loaded in the demo room. |
-| H3 | Lag on screen, SLO in Dash0, Spanish question matches English captions, speaker view with opt-in. |
-| H5 | Feature freeze. |
+| 3:15 PM | Schemas merged, everyone on the new `main`. OpenAI key and Elastic Cloud project work from the cluster. |
+| 3:45 PM | Someone speaks, and a phone on the public URL shows EN + ES captions. Trace visible in Dash0. |
+| 4:30 PM | Lag on screen, SLO in Dash0, a Spanish question matches English captions, speaker view shows questions. Test talk pre-loaded. |
+| 4:45 PM | **Feature freeze.** |
+| 5:30 PM | Submitted. |
 
 ## Parallel work: encouraged
 
-After phase 01, the three lanes run at the same time and should not wait on each other.
-
-- **One lane, one folder set, one branch.** Pipeline: `backend/roompass/pipeline/`, `backend/roompass/translator/`. App: `backend/roompass/api/`, `web/`. Platform: `deploy/`, `.github/`, `.gitar/`, flagd config. Shared models in `backend/roompass/models/` are frozen after 01.
-- **Build against the contract, not each other.** Each lane gets a fake for what it consumes:
-  - App builds the phone page against a replay of the seeded segments over SSE, and the api against seeded Redis streams.
-  - Pipeline tests the translator on fixture text, and the pipeline on the recorded 3-minute test talk.
-  - Platform deploys the current images and placeholder processes until the real ones land.
-- **Split inside a lane too (subagents, AGT-03).** These pairs share no files:
-  - App: api + Elasticsearch / phone page + speaker view
-  - Pipeline: STT / translator
-  - Platform: manifests + flagd / Dash0 dashboards + SLO / Gitar review rules
-- **Phases 05 and 06 run side by side.** Thresholds (App), chaos rehearsal (Platform) and catch me up (Pipeline) don't touch the same files.
-- **Phase 07 splits by owner.** Each person writes their own `docs/tools/<tool>.md`. App polishes the phone page while Pipeline records the backup video and Platform runs the audit.
+- **One lane, one folder set, one branch.** Backend: `backend/roompass/` (except `generated/`, `contract.py` and `themes/`). Themes: `backend/roompass/themes/`. Web: `web/src/` (except `types/generated/`). Platform: `deploy/`, `.github/`, `.gitar/`, `docs/tools/`.
+- **Build against the contract, not each other.**
+  - Web builds against a fake SSE stream that replays the seeded segments from `schema/examples/`.
+  - Backend tests on the recorded 3-minute test talk with `curl`.
+  - Platform deploys the current images until the real ones land.
 
 ## Parallel work: not allowed
 
-- **Phase 01.** Nobody builds until all 3 agree on the contract.
-- **Contract changes after 01** are "ask first" (CT-05): announce to all three, one PR, everyone rebases.
-- **Merges to `main` go one at a time.** Each merge deploys and CI adds a `deploy: <sha>` commit. Wait for it, `git pull --rebase`, then the next PR merges. Skipping this caused the conflict on PR #4.
-- **Only Platform edits `deploy/`.** Other lanes ask Platform for a new Deployment, env var or Secret.
-- **Elasticsearch mappings** are set in 01. A mapping change needs a reindex, so it is ask first.
+- **Contract changes after 01** are "ask first": announce to all three, one PR, everyone rebases.
+- **Merges to `main` go one at a time.** Each merge deploys and CI adds a `deploy: <sha>` commit. Wait for it, `git pull --rebase`, then the next PR merges.
+- **Only Platform edits `deploy/`.** Other lanes ask Platform for a new env var or Secret.
+- **Elasticsearch mappings** follow `CONTRACT.md`. A mapping change needs a reindex, so it is ask first.
 
 ## Requirements
 
-Copied verbatim from the brief's "Must ship".
+Copied from the brief's "Must ship".
 
-1. **Live captions** in EN and ES, with the lag on screen ("live · 1.4s behind").
-2. **Typed Q&A with a soft match.** "Possibly covered at 12:04" plus the caption line, match score and a **Still ask** button. Works across languages: a Spanish question matches English captions. Phones show the top questions, with a filter. Spanish questions show in English on the speaker view.
-3. **Speaker link.** Start button, and press-and-hold 3s to stop so a misclick never ends the talk. Questions sorted by votes. One opt-in switch for saving the transcript.
+1. **Live captions** in EN and ES, with the lag on screen ("live · 6.2s behind").
+2. **Typed Q&A with a soft match.** "Possibly covered at 12:04" plus the caption line, match score and a **Still ask** button. Works across languages: a Spanish question matches English captions. Phones show the top questions. Spanish questions show in English on the speaker view.
+3. **Speaker link.** Start button, and press-and-hold 3s to stop so a misclick never ends the talk. Questions sorted by votes.
 4. **Accessible app.** Font size, high contrast, screen reader labels, one-handed use, and a "machine captions, may contain errors" label.
 
-**Never cut:** captions with lag, Q&A match, the ops story.
+**Never cut:** captions with lag, Q&A match, the Dash0 and Radar story.
 
 **Rule for AI:** AI transcribes and translates. It never decides what is true. Catch-up bullets must cite existing segment IDs, or code drops them. "Possibly covered" uses Elasticsearch search, no generation.
 
 ## Cut on purpose
 
-- **From the brief:** follow-a-talk, end-of-talk summary, EN/ES question merge, edge mode, join-code rotation, TTL deletion, chatbot, more than 2 languages, accounts, notifications, schedules, sign language, recordings. None of them is on the demo path.
-- **Moonshine self-hosted STT:** no judging line rewards it. Only if captions already work end to end at H1.
-- **Catch me up:** stretch, first in the cut order if late.
-- **Question filter:** third in the cut order.
-- **Tests beyond two:** only the captions-path latency check and the citation validator (if catch-up ships), both enforced by Gitar rules.
-- **Judges scanning the QR as part of the demo:** bonus only. 12 judges typing takes 60+ seconds, so the demo runs on our phones.
-- **The placeholder `web/` hello page and `/api/health`:** replaced by the real phone page and api in 03.
+- **From the full brief:** Redis Streams, flagd and the chaos flag, OPUS-MT, Moonshine, WebSocket audio, 15 s passages, transcript opt-in switch, follow-a-talk, end-of-talk summary, EN/ES question merge, edge mode, join-code rotation, TTL deletion. They go on the "what's next" slide.
+- **Tests beyond two:** only the citation validator and a quick captions-path check.
+- **Judges scanning the QR as part of the demo:** bonus only. The demo runs on our phones.
 
-**Cut order if late:** catch me up, then the Moonshine swap, then the question filter.
+**Cut order if late:** question themes, then catch me up, then the question filter, then vote counts. Never captions, the Q&A match or the ops story.

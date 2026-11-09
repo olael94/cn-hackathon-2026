@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 
 // Local replay for the two UI clients until the room streaming service ships.
@@ -22,21 +22,21 @@ export const captions = [
     time: '12:09',
     en: 'We measure delay from the moment a speaker finishes a line to the moment it reaches your phone.',
     es: 'Medimos el retraso desde que el ponente termina una frase hasta que aparece en tu teléfono.',
-    lag: 1.4,
+    lag: 5.2,
   },
   {
     id: 43,
     time: '12:17',
     en: 'A slower translation changes that number, even when the audio arrives on time.',
     es: 'Una traducción más lenta cambia ese número, aunque el audio llegue a tiempo.',
-    lag: 2.6,
+    lag: 8.1,
   },
   {
     id: 44,
     time: '12:25',
-    en: 'The threshold is three seconds. This caption arrived outside that window.',
-    es: 'El umbral es de tres segundos. Este subtítulo llegó fuera de ese margen.',
-    lag: 4.8,
+    en: 'The threshold is ten seconds. This caption arrived outside that window.',
+    es: 'El umbral es de diez segundos. Este subtítulo llegó fuera de ese margen.',
+    lag: 12.4,
   },
   {
     id: 45,
@@ -74,6 +74,7 @@ function readSession(): Session | null {
 }
 
 export function useDemoRoom(speaker: boolean) {
+  const localOnly = useRef(false)
   const [session, setSession] = useState(readSession)
   const [previewStart, setPreviewStart] = useState(Date.now)
   const [now, setNow] = useState(Date.now)
@@ -83,7 +84,7 @@ export function useDemoRoom(speaker: boolean) {
   useEffect(() => {
     const tick = window.setInterval(() => setNow(Date.now()), 500)
     const sync = (event: StorageEvent) => {
-      if (event.key === roomKey) setSession(readSession())
+      if (!localOnly.current && event.key === roomKey) setSession(readSession())
     }
     const offline = () => {
       setDisconnectedAt(Date.now())
@@ -104,9 +105,14 @@ export function useDemoRoom(speaker: boolean) {
     }
   }, [])
 
-  function update(next: Session | null) {
-    if (next) localStorage.setItem(roomKey, JSON.stringify(next))
-    else localStorage.removeItem(roomKey)
+  function update(next: Session) {
+    try {
+      localStorage.setItem(roomKey, JSON.stringify(next))
+      localOnly.current = false
+    } catch {
+      // Storage can be readable but reject writes. This tab owns the session until a write succeeds.
+      localOnly.current = true
+    }
     setSession(next)
     setNow(Date.now())
   }
@@ -133,7 +139,10 @@ export function useDemoRoom(speaker: boolean) {
     ? start + (visible.length - 3) * 8000
     : start + 2000 + (visible.length - 1) * 8000
   const ended = phase === 'ended' || (preview && count > captions.length)
-  const reconnecting = !online || (resumedAt > start && lastArrival < resumedAt)
+  const awaitingFreshSegment = resumedAt > start && lastArrival < resumedAt
+  const sampleComplete =
+    count > captions.length ||
+    (visible.length === captions.length && awaitingFreshSegment)
   const latest = visible.at(-1)
   const badge = !online
     ? 'Reconnecting'
@@ -141,28 +150,18 @@ export function useDemoRoom(speaker: boolean) {
       ? 'Talk ended'
       : phase === 'waiting'
         ? 'Waiting for speaker'
-        : reconnecting
-          ? 'Reconnecting'
-          : !latest
-            ? 'Waiting for first caption'
-            : count > captions.length
-              ? 'Sample complete'
+        : sampleComplete
+          ? 'Sample complete'
+          : awaitingFreshSegment
+            ? 'Reconnecting'
+            : !latest
+              ? 'Waiting for first caption'
               : null
-  const next = captions[visible.length]
-  const sinceLast = now - lastArrival
-  const partial =
-    next && phase === 'live' && !badge && sinceLast >= 4800
-      ? next.en
-          .split(' ')
-          .slice(0, Math.min(10, Math.floor((sinceLast - 4000) / 300)))
-          .join(' ')
-      : ''
   return {
     phase,
     visible,
     badge,
     latest,
-    partial,
     ended,
     preview,
     savedTranscript:
@@ -177,7 +176,7 @@ export function useDemoRoom(speaker: boolean) {
     start: (save: boolean) =>
       update({ phase: 'live', started: Date.now(), stopped: 0, save }),
     stop: () => {
-      const active = readSession() ?? session
+      const active = localOnly.current ? session : (readSession() ?? session)
       if (active?.phase === 'live')
         update({ ...active, phase: 'draining', stopped: Date.now() })
     },

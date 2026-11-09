@@ -474,18 +474,6 @@ h2 {
 .waiting p {
   color: var(--muted-foreground);
 }
-.partial {
-  position: sticky;
-  bottom: calc(80px + env(safe-area-inset-bottom));
-  background: var(--card);
-  border: 1px dashed var(--border-strong);
-  margin-top: 10px;
-  padding: 10px 18px;
-  color: var(--muted-foreground);
-}
-.partial .meta {
-  color: var(--primary);
-}
 .panel {
   border: 1px solid var(--border);
   border-radius: 4px;
