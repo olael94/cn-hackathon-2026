@@ -38,17 +38,31 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
+      - name: Build web
+        uses: docker/build-push-action@v6
         with:
-          context: .
+          context: web
+          push: true
+          build-args: |
+            VITE_DASH0_ENDPOINT=${{ vars.VITE_DASH0_ENDPOINT }}
+            VITE_DASH0_AUTH_TOKEN=${{ secrets.VITE_DASH0_AUTH_TOKEN }}
+          tags: |
+            ${{ steps.meta.outputs.image }}:web-${{ steps.meta.outputs.tag }}
+            ${{ steps.meta.outputs.image }}:web-latest
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+      - name: Build backend
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
           push: true
           build-args: APP_VERSION=${{ steps.meta.outputs.tag }}
           tags: |
-            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
-            ${{ steps.meta.outputs.image }}:latest
+            ${{ steps.meta.outputs.image }}:backend-${{ steps.meta.outputs.tag }}
+            ${{ steps.meta.outputs.image }}:backend-latest
           labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
 
-      - name: Point the manifests at the new image
+      - name: Point the manifests at the new images
         env:
           IMAGE: ${{ steps.meta.outputs.image }}
           TAG: ${{ steps.meta.outputs.tag }}
@@ -61,7 +75,7 @@ jobs:
           for attempt in 1 2 3 4 5; do
             git fetch -q origin main
             git reset -q --hard FETCH_HEAD
-            yq -i '(.images[] | select(.name == "app")) |= (.newName = strenv(IMAGE) | .newTag = strenv(TAG))' deploy/kustomization.yaml
+            yq -i '(.images[] | select(.name == "web" or .name == "backend")) |= (.newName = strenv(IMAGE) | .newTag = .name + "-" + strenv(TAG))' deploy/kustomization.yaml
             if git diff --quiet; then exit 0; fi
             git commit -qam "deploy: ${TAG} [skip ci]"
             if git push -q origin HEAD:main; then exit 0; fi

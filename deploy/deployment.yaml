@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: app
-          image: app
+          image: web
           ports:
             - name: http
               containerPort: 8080

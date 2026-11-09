@@ -98,7 +98,7 @@ Pick what your project needs. None of it is required, and more doesn't score hig
 
 For credentials, one-off Jobs, dependencies and checking the running app, see [the optional agent workflows](examples/agent-workflows/README.md).
 
-Replace `app/` with your own project whenever you like. Keep it listening on `$PORT` (8080) with `/healthz` and `/readyz`, or update the probes in `deploy/`. The Dockerfile installs the dependencies in `app/package.json`; for another language, change the Dockerfile too.
+The app is two images built from this repo: `web/` (Vite + React, served by nginx on 8080 as Deployment `app`) and `backend/` (FastAPI on 8000 as Deployment and Service `backend`). nginx sends `/api/*` to the backend. Both answer `/healthz` and `/readyz`.
 
 ## What the judges look for
 

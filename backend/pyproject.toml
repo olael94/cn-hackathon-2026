@@ -1,0 +1,23 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "FastAPI backend for the-mok-team"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.162.2",
+    "opentelemetry-distro>=0.66b2",
+    "opentelemetry-exporter-otlp>=1.45.2",
+    "opentelemetry-instrumentation-fastapi>=0.66b2",
+    "uvicorn>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.4",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

@@ -1,5 +1,5 @@
 # Argo CD deploys this folder to your team's namespace. The GitHub Action
-# sets the image below on every push to main; don't edit newName or newTag
+# sets the images below on every push to main; don't edit newName or newTag
 # by hand.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -8,7 +8,11 @@ resources:
   - deployment.yaml
   - service.yaml
   - httproute.yaml
+  - backend.yaml
 images:
-  - name: app
+  - name: web
     newName: ghcr.io/olael94/cn-hackathon-2026
     newTag: "5554409"
+  - name: backend
+    newName: ghcr.io/olael94/cn-hackathon-2026
+    newTag: backend-pending
