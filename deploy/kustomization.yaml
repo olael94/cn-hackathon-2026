@@ -11,6 +11,7 @@ resources:
   - backend.yaml
   - translator.yaml
   - flagd.yaml
+  - pdb.yaml
 images:
   - name: web
     newName: ghcr.io/olael94/cn-hackathon-2026

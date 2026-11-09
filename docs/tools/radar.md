@@ -28,11 +28,22 @@ The pod's events showed readiness and liveness probes refused for the few second
 
 | Resource | Check | Decision |
 | --- | --- | --- |
-| `backend` | Only 1 replica | Skip. On purpose: SSE fan-out lives in memory, so a second pod would miss segments (`deploy/backend.yaml`, `.gitar/review/kubernetes.md`). Needs shared pub/sub first. |
-| `app` | 2 replicas, no PodDisruptionBudget | To decide |
-| `app` | 2 replicas, no topology spread | To decide |
-| `app`, `backend` | Service account token auto-mounted | To decide. Neither pod calls the Kubernetes API. |
-| `app`, `backend` | Root filesystem not read-only | To decide. nginx writes its config at startup, so it would need an `emptyDir`. |
+| `backend` | Only 1 replica | Skip. On purpose: SSE fan-out lives in memory, so a second pod would miss segments (`deploy/backend.yaml`, `.gitar/review/kubernetes.md`, `.gitar/rules/backend-single-replica.md`). Needs shared pub/sub first. |
+| `app` | 2 replicas, no PodDisruptionBudget | Fixed on branch `fix/radar-audit`: `deploy/pdb.yaml`, `minAvailable: 1`. |
+| `app` | 2 replicas, no topology spread | Fixed on branch `fix/radar-audit`: spread by `kubernetes.io/hostname`, `ScheduleAnyway` so a full node never blocks scheduling. |
+| `app`, `backend` | Service account token auto-mounted | Fixed on branch `fix/radar-audit`: `automountServiceAccountToken: false`. Neither pod calls the Kubernetes API. |
+| `app`, `backend` | Root filesystem not read-only | Skip for the demo. nginx writes its config at startup and Python writes to `/tmp`, so both need `emptyDir` mounts; one wrong path crashes the pod before the demo. |
+
+### After (2026-11-09, 3:30 PM MT)
+
+`get_cluster_audit` on `team-the-mok-team`: 12 findings, all medium, 0 high. The 5 new ones come from `flagd` and `translator`, added today in PR #10.
+
+| Resource | Check | Decision |
+| --- | --- | --- |
+| `flagd`, `translator` | Service account token auto-mounted | Fixed on branch `fix/radar-audit`. flagd reads its flags from a file, not the Kubernetes API. |
+| `translator` | Root filesystem not read-only | Skip for the demo, same reason as `backend` (same image). |
+| `translator` | Only 1 replica | Skip. It is the chaos target in the demo, and one pod keeps the story readable in Radar and Dash0. Fits the budget either way. |
+| `flagd` | Only 1 replica | Skip. Flags are a demo control, and a restart loads the same file from the ConfigMap. |
 
 ## Tooling problems
 
