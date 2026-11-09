@@ -83,7 +83,7 @@ AI transcribes and translates, both with OpenAI models (check exact names in the
 
 - **Segment:** one finished caption line from one 5 s audio chunk, with `t_start`, `t_end`, `text_en`, `text_es`. Also the unit for semantic matching.
 - **Lag:** phone receive time minus (talk `started_at` + segment `t_end`), corrected with the SSE hello clock offset. SLO: p95 under 10 s.
-- **Soft match:** "Possibly covered" shown only when the top match is a keyword hit with a semantic score of at least 0.6, or has a semantic score of at least 0.8 (`CONTRACT.md`).
+- **Soft match:** "Possibly covered" shown only when the top match is a keyword hit with a semantic score of at least 0.6, or has a semantic score of at least 0.68 (`CONTRACT.md`).
 - **Theme:** a group of related on-topic questions with one label, ranked by total votes.
 
 ## 12. Open questions
