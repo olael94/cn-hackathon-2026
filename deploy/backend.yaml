@@ -5,7 +5,8 @@ metadata:
   labels:
     app: backend
 spec:
-  replicas: 2
+  # One replica: SSE fan-out lives in memory. More pods need a shared pub/sub first.
+  replicas: 1
   selector:
     matchLabels:
       app: backend

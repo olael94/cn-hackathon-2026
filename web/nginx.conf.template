@@ -10,6 +10,16 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+
+        # SSE: pass events through as they arrive and keep long streams open.
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 1h;
+
+        # Audio chunks are small, but leave room above the 1 MB default.
+        client_max_body_size 10m;
     }
 
     location / {
