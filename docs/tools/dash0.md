@@ -79,7 +79,7 @@ Panels: caption lag p50/p95 against the 10 s line, p95 for each pipeline span, p
 ## Chaos demo beat (demo path step 4)
 
 1. A talk is live. Phones show "live · 1.4s behind". Dashboard and SLO page open on the laptop.
-2. Flip the flagd flag `translator-chaos-delay-ms` on (for example 8000). Each translation now waits that long.
+2. Flip the flagd flag `translator-chaos-delay-ms` to its `on` variant (10000 ms in `deploy/flagd.yaml`). Each translation now waits that long.
 3. On the phone the lag climbs past 10 s. On the dashboard, caption lag p95 crosses the 10 s line and `pipeline.translate` p95 jumps while the other spans stay flat. The check rule fires. The SLO's SLI drops and the error budget goes down.
 4. Ask Agent0: "Why is caption lag up?" It should point at `pipeline.translate` (span durations in the traces of the slow segments).
 5. Flip `translator-fallback` on. Lag on the phone drops back within seconds. The dashboard follows within about two minutes (2-minute rate window, so it always spans at least two 1-minute aggregations).
