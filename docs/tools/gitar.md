@@ -4,7 +4,7 @@ Gitar reviews every PR against the rules in `.gitar/review/`. Each feature lands
 
 ## Findings by PR
 
-PRs 1 to 3 and #10 (flagd and translator manifests) had no findings. PR 1 was the smoke test that confirmed Gitar reviews this repo.
+PRs 1 to 3, #10 (flagd and translator manifests) and #18 (Radar audit fixes, `Rules 3/3 met`) had no findings. PR 1 was the smoke test that confirmed Gitar reviews this repo.
 
 | PR | Type | Finding | Outcome |
 | --- | --- | --- | --- |
@@ -29,6 +29,10 @@ PRs 1 to 3 and #10 (flagd and translator manifests) had no findings. PR 1 was th
 | #14 | Bug | `[1m]` rate windows can return no data with a 1-minute SignalControl aggregation, leaving panels empty and the lag alert silent | Taken. Fixed by @melizalde-ds in `8cb2d9a`: every window is `[2m]` |
 | #15 | Quality | Radar budget row mixed scopes: memory requests 1856Mi above limits 1152Mi, which Kubernetes can't allow | Taken. Fixed by @melizalde-ds in this PR: namespace and cluster totals stated separately |
 | #16 | Edge case | One-backend-pod rule skipped kustomize `replicas:` or `patches:` overrides in `deploy/kustomization.yaml` | Taken. Fixed by @melizalde-ds in `3c77b39`: trigger covers kustomization overrides |
+| #17 | Bug | Chaos runbook said to flip the delay flag to 8000 ms, but flagd's `on` variant was 4000 ms, so lag would reach about 5.4 s and never cross the 10 s SLO line in the demo | Taken. Fixed by @melizalde-ds in `01425ef`: `on` raised to 10000 in `deploy/flagd.yaml` and the runbook names that variant |
+| #19 | Bug | `load_state` race after a restart: phones reconnecting at once each built their own `TalkState`, and all but the last stopped getting captions with no error | Taken. Fixed in PR #19 before merge |
+| #19 | Security | `/api/translate` proxy was open with no auth | Taken. Fixed in PR #19 before merge |
+| #19 | Bug | A stale `arrived_at` entry made stopping a talk wait 5 s | Taken. Fixed in PR #19 before merge |
 | #20 | Bug | Themes cache never refreshed, because nothing calls `note_question_change` yet, so the first `ThemeSet` stayed for the whole talk | Taken. Fixed by @melizalde-ds in `7c4f8c5`: rebuild when the cached set is older than 60 seconds |
 | #20 | Quality | `.env.example` set `THEMES_LABEL_MODEL=gpt-5.4-mini`, a second copy of the code default | Taken. Fixed by @melizalde-ds in `7c4f8c5`: value left empty, and an empty value falls back to the default |
 
