@@ -137,4 +137,4 @@ Never:
 
 <!-- Add a line each time an agent makes the same mistake twice. Delete lines that stop being true. -->
 
--
+- A new `app` (web) pod can restart once on rollout with `nginx: [emerg] host not found in upstream "backend"`. `web/nginx.conf.template` uses a fixed `proxy_pass ${BACKEND_URL}`, so nginx looks up `backend` once at startup and exits if cluster DNS isn't answering yet. The restart succeeds and the app serves fine; one restart is expected, a loop is not (seen 2026-11-09, image `web-0a547db`).
