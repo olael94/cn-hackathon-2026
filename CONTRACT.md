@@ -226,7 +226,7 @@ Never put transcript text or question text in span attributes or logs. IDs, coun
 | `questions` | `id` | `talk_id` (keyword), `text`, `lang`, `text_en`, `votes` (int), `voters` (keyword array of device ids), `created_at`, `semantic` (`semantic_text`, same `inference_id` as `segments`), `topic_score` (float) |
 
 - `semantic` holds `text_en`, so English and Spanish questions both match it. On `questions` it is used to group questions into themes.
-- "Possibly covered" = BM25 on `text_en` and `text_es` plus semantic on `semantic`, combined with RRF for ordering. `covered` is true only when the top RRF-ordered match is a keyword hit with semantic `score >= 0.6`, or has semantic `score >= 0.8`. Tune these on about 10 seeded pairs.
+- "Possibly covered" = BM25 on `text_en` and `text_es` plus semantic on `semantic`, combined with RRF for ordering. `covered` is true only when the top RRF-ordered match is a keyword hit with semantic `score >= 0.6`, or has semantic `score >= 0.68`. RRF ties go to the higher semantic score. Tuned on Nov 9 with `.jina-embeddings-v3`: related EN/ES questions scored 0.69 to 0.81, unrelated ones 0.50 to 0.58. Python entry point: `search.check_question(text, talk_id=None)` returns `(covered, matches)`; without `talk_id` it searches every talk.
 
 ## Who owns what
 

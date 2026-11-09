@@ -100,4 +100,5 @@ Panels: caption lag p50/p95 against the 10 s line, p95 for each pipeline span, p
 | 2026-11-09, 3:05 PM | Native SLOs use a fixed 28-day window, so the fastest burn alert needs about 2% of the budget in an hour. A 2-minute chaos run may not trip it. | Added a check rule (p95 over 10 s for 30 s) as the alert shown in the demo. |
 | 2026-11-09, 3:05 PM | `backend/Dockerfile` sets `OTEL_SDK_DISABLED=true`, so the backend sends nothing until the `otel` Secret overrides it. | The `otel` Secret must set `OTEL_SDK_DISABLED: "false"`. |
 | 2026-11-09, 3:09 PM | Gitar on PR #14: `[1m]` rate windows can return no data with a 1-minute SignalControl aggregation. | Taken. Every rate window widened to `[2m]` (dashboard JSON and check rule). |
+| 2026-11-09, 4:05 PM | The `otel` Secret created at 3:55 PM had the endpoint, headers and dataset but not `OTEL_SDK_DISABLED: "false"`, so the backend still sent nothing. Found by re-reading the row above while syncing the tool logs. | The Secret script now adds `OTEL_SDK_DISABLED: "false"`. Re-apply the `otel` Secret, restart `backend` and `translator`, then check for `backend` traces in Dash0. |
 
