@@ -27,17 +27,31 @@ def snapshot(row: sqlite3.Row | None) -> DemoReplay:
     )
 
 
-def room_row(db: sqlite3.Connection, room: str) -> sqlite3.Row | None:
-    return db.execute(
-        "SELECT r.*,v.talk_id FROM replays r LEFT JOIN room_voice v USING (room) WHERE r.room=?",
-        (room,),
-    ).fetchone()
+def room_row(room: str) -> sqlite3.Row | None:
+    with database() as db:
+        return db.execute(
+            "SELECT r.*,v.talk_id FROM replays r LEFT JOIN room_voice v USING (room) "
+            "WHERE r.room=?",
+            (room,),
+        ).fetchone()
+
+
+def store_replay(room: str, state: DemoReplay, owner: str | None) -> None:
+    with database() as db:
+        if state.voice_id:
+            db.execute("INSERT OR REPLACE INTO room_voice VALUES (?,?)", (room, state.voice_id))
+        else:
+            db.execute("DELETE FROM room_voice WHERE room=?", (room,))
+        db.execute(
+            "INSERT OR REPLACE INTO replays (room,revision,started_ms,stopped_ms,owner) "
+            "VALUES (?,?,?,?,?)",
+            (room, state.revision, state.started_ms, state.stopped_ms, owner),
+        )
 
 
 @router.get("/{room}/replay")
 def replay(room: Room) -> DemoReplay:
-    with database() as db:
-        return snapshot(room_row(db, room))
+    return snapshot(room_row(room))
 
 
 @router.post("/{room}/replay/{action}")
@@ -53,8 +67,7 @@ async def control_replay(
     owner = hashlib.sha256(token.bytes).hexdigest()
     lock = room_locks.setdefault(room, asyncio.Lock())
     async with lock:
-        with database() as db:
-            row = room_row(db, room)
+        row = await asyncio.to_thread(room_row, room)
         state = snapshot(row)
         if row and row["owner"] and row["owner"] != owner:
             raise HTTPException(403, "Use the speaker browser that started this replay.")
@@ -116,20 +129,5 @@ async def control_replay(
             raise HTTPException(409, "This control is unavailable in the current replay.")
         state.revision += 1
         state.server_ms = time.time_ns() // 1_000_000
-        with database() as db:
-            if state.voice_id:
-                db.execute("INSERT OR REPLACE INTO room_voice VALUES (?,?)", (room, state.voice_id))
-            else:
-                db.execute("DELETE FROM room_voice WHERE room=?", (room,))
-            db.execute(
-                "INSERT OR REPLACE INTO replays (room,revision,started_ms,stopped_ms,owner) "
-                "VALUES (?,?,?,?,?)",
-                (
-                    room,
-                    state.revision,
-                    state.started_ms,
-                    state.stopped_ms,
-                    owner if action != "reset" else None,
-                ),
-            )
+        await asyncio.to_thread(store_replay, room, state, None if action == "reset" else owner)
         return state

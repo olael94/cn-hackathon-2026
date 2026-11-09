@@ -2,7 +2,9 @@ import { z } from 'zod'
 import { demoRoom } from '@/api/demo'
 
 export const talksUrl = (import.meta.env.VITE_API_URL ?? '/api') + '/talks'
-const credentials = z.object({id: z.string(), token: z.string(), next: z.number().int()})
+const credentials = z.object({
+  id: z.string(), token: z.string(), next: z.number().int(), elapsed: z.number().nonnegative().optional(),
+})
 type SpeakerSession = z.infer<typeof credentials>
 const key = 'roompass:live-speaker:' + demoRoom
 let current: SpeakerSession | undefined
@@ -33,7 +35,7 @@ export async function startLiveTalk() {
   })
   if (!response.ok) throw new Error('The live caption service is unavailable. Try again or select Sample replay.')
   const created = z.object({talk: z.object({talk_id: z.string()}), speaker_token: z.string()}).parse(await response.json())
-  const session = {id: created.talk.talk_id, token: created.speaker_token, next: 0}
+  const session = {id: created.talk.talk_id, token: created.speaker_token, next: 0, elapsed: 0}
   await transition(session, 'start')
   return session
 }

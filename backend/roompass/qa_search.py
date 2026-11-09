@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import os
 import re
 import unicodedata
@@ -18,6 +19,8 @@ from roompass.prompts import ROUTING_INSTRUCTIONS
 from roompass.question_language import language_for
 
 REPLAY_TALK = "rpdemo"
+log = logging.getLogger(__name__)
+ROUTING_MODEL = os.getenv("ROOMPASS_QA_DECISIONS_MODEL") or "gpt-6-luna"
 # Limit uncached paid requests for one demo server run.
 _decision_budget = 30
 _decision_lock = Lock()
@@ -79,8 +82,10 @@ def route_question(text: str, groups: list[Group]) -> tuple[str, str | None]:
             route = classify(tuple(candidates[:8]), text)
             if route is not None:
                 action, target = route
-        except (URLError, TimeoutError, ValueError, KeyError, IndexError, TypeError):
-            pass
+        except (URLError, TimeoutError, ValueError, KeyError, IndexError, TypeError) as exc:
+            log.warning(
+                "Using fallback Q&A routing for model %s (%s)", ROUTING_MODEL, type(exc).__name__
+            )
     return action, target
 
 
@@ -98,6 +103,10 @@ def classify(
         if _decision_budget <= 0:
             return None
         _decision_budget -= 1
+        if _decision_budget == 0:
+            log.warning(
+                "Q&A routing budget exhausted. Subsequent uncached decisions use fallback routing."
+            )
 
     routes = {"ask": ("ask", None)}
     options = [{"value": "ask", "description": "Publish independently."}]
@@ -118,7 +127,7 @@ def classify(
     ]
     data = {"draft": draft, "questions": questions}
     body = {
-        "model": "gpt-6-luna",
+        "model": ROUTING_MODEL,
         "input": [{"role": "user", "content": [{"type": "input_json", "data": data}]}],
         "questions": criteria,
     }

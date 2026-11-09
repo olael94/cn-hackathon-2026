@@ -33,7 +33,8 @@ export function useDemoRoom(speaker: boolean, language: 'en' | 'es') {
     time: new Date(Math.floor(line.t_end) * 1000).toISOString().slice(11, 19),
     en: line.text_en, es: line.text_es ?? line.text_en,
     translationMissing: !line.text_es,
-    lag: Math.max(0, (Date.parse(line.emitted_at) - (started ?? 0)) / 1000 - line.t_end),
+    lag: Math.max(0, (Date.parse(line.emitted_at) - (line.captured_at
+      ? Date.parse(line.captured_at) : (started ?? 0) + line.t_end * 1000)) / 1000),
   })) : captions.slice(0, count)
   const nextCaption = started !== null && count < captions.length ? started + 2000 + count * 8000 : Infinity
   const nextChange = Math.min(nextCaption, finish !== null && now < finish ? finish : Infinity)

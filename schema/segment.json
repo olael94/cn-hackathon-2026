@@ -8,6 +8,7 @@
     "seq": { "type": "integer", "minimum": 0 },
     "t_start": { "type": "number" },
     "t_end": { "type": "number" },
+    "captured_at": { "type": ["string", "null"], "format": "date-time" },
     "text_en": { "type": "string" },
     "text_es": { "type": ["string", "null"] },
     "emitted_at": { "type": "string", "format": "date-time" }

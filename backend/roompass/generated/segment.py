@@ -15,6 +15,7 @@ class Segment(BaseModel):
     seq: conint(ge=0)
     t_start: float
     t_end: float
+    captured_at: AwareDatetime | None = None
     text_en: str
     text_es: str | None
     emitted_at: AwareDatetime

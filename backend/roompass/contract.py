@@ -4,6 +4,7 @@ The models are generated from schema/*.json by scripts/gen-types.sh. Change the 
 regenerate; don't edit or redefine them here.
 """
 
+from roompass.generated.capture_position import CapturePosition
 from roompass.generated.catchup import Bullet, CatchUp
 from roompass.generated.demo_check import DemoCheck
 from roompass.generated.demo_contribution import DemoContribution
@@ -21,6 +22,7 @@ from roompass.generated.translate_response import TranslateResponse
 
 __all__ = [
     "Bullet",
+    "CapturePosition",
     "CatchUp",
     "DemoCheck",
     "DemoContribution",

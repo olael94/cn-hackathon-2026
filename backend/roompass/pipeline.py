@@ -28,11 +28,11 @@ from fastapi import APIRouter, File, Form, Header, HTTPException, Request, Uploa
 from openai import AsyncOpenAI
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
-from pydantic import BaseModel
+from pydantic import AwareDatetime, BaseModel
 from sse_starlette import EventSourceResponse
 
 from roompass import prompts, search
-from roompass.contract import Segment, Talk, TranslateRequest, TranslateResponse
+from roompass.contract import CapturePosition, Segment, Talk, TranslateRequest, TranslateResponse
 
 log = logging.getLogger("roompass.pipeline")
 tracer = trace.get_tracer("roompass.pipeline")
@@ -79,6 +79,7 @@ class TalkState:
     buffer: deque[Segment] = field(default_factory=lambda: deque(maxlen=BUFFER_SIZE))
     subscribers: set[asyncio.Queue[dict[str, Any]]] = field(default_factory=set)
     next_publish: int = 0  # the seq we publish next
+    audio_end: float = 0.0  # greatest accepted chunk end, including silence and pending uploads
     done: dict[int, Segment | None] = field(default_factory=dict)  # finished, waiting for order
     arrived_at: dict[int, float] = field(default_factory=dict)  # seq -> monotonic arrival time
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
@@ -122,6 +123,7 @@ async def load_state(talk_id: str) -> TalkState:
     stored = await search.get_segments(talk_id)
     if stored:
         state.next_publish = stored[-1].seq + 1
+        state.audio_end = stored[-1].t_end
         state.buffer.extend(stored[-BUFFER_SIZE:])
     # Another request may have loaded the talk while we awaited Elasticsearch.
     return talks.setdefault(talk_id, state)
@@ -286,7 +288,13 @@ async def index_quietly(segment: Segment) -> None:
 
 
 async def process_chunk(
-    state: TalkState, audio: bytes, filename: str, seq: int, t_start: float, t_end: float
+    state: TalkState,
+    audio: bytes,
+    filename: str,
+    seq: int,
+    t_start: float,
+    t_end: float,
+    captured_at: datetime | None = None,
 ) -> None:
     talk_id = state.talk.talk_id
     segment: Segment | None = None
@@ -300,6 +308,7 @@ async def process_chunk(
                 seq=seq,
                 t_start=t_start,
                 t_end=t_end,
+                captured_at=captured_at,
                 text_en=text_en,
                 text_es=text_es,
                 emitted_at=now_utc(),
@@ -348,15 +357,15 @@ async def get_talk(talk_id: str) -> Talk:
 @router.get("/talks/{talk_id}/capture")
 async def capture_position(
     talk_id: str, x_speaker_token: Annotated[str | None, Header()] = None
-) -> dict[str, float | int]:
+) -> CapturePosition:
     state = await load_state(talk_id)
     require_speaker(state, x_speaker_token)
     if state.talk.status != "live" or not state.talk.started_at:
         raise HTTPException(409, "Voice capture has ended.")
-    return {
-        "seq": max([state.next_publish - 1, *state.arrived_at, *state.done]) + 1,
-        "elapsed": (now_utc() - state.talk.started_at).total_seconds(),
-    }
+    return CapturePosition(
+        seq=max([state.next_publish - 1, *state.arrived_at, *state.done]) + 1,
+        elapsed=state.audio_end,
+    )
 
 
 @router.post("/talks/{talk_id}/start")
@@ -389,6 +398,7 @@ async def upload_audio(
     t_start: Annotated[float, Form()],
     t_end: Annotated[float, Form()],
     x_speaker_token: Annotated[str | None, Header()] = None,
+    captured_at: Annotated[AwareDatetime | None, Form()] = None,
 ) -> AudioAccepted:
     state = await load_state(talk_id)
     require_speaker(state, x_speaker_token)
@@ -402,8 +412,11 @@ async def upload_audio(
     if seq < state.next_publish or seq in state.arrived_at:
         return AudioAccepted(seq=seq)
     state.arrived_at.setdefault(seq, time.monotonic())
+    state.audio_end = max(state.audio_end, t_end)
     # Answer the speaker page right away; the work runs in the background.
-    spawn(process_chunk(state, audio, file.filename or "chunk.webm", seq, t_start, t_end))
+    spawn(
+        process_chunk(state, audio, file.filename or "chunk.webm", seq, t_start, t_end, captured_at)
+    )
     spawn(gap_check(state))
     return AudioAccepted(seq=seq)
 

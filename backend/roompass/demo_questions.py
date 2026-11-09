@@ -1,5 +1,6 @@
 """Shared, single-replica Q&A store for the caption replay."""
 
+import asyncio
 import hashlib
 import sqlite3
 import time
@@ -112,28 +113,27 @@ def questions(room: Room, device: Device) -> list[Group]:
         return read_queue(db, room, str(device))
 
 
-@router.post("/{room}/questions/check")
-async def check_question(room: Room, device: Device, body: Check) -> Review:
+def check_context(room: str, device: str) -> tuple[str, list[Group]]:
     with database() as db:
-        talk = caption_talk(db, room)
-        queue = read_queue(db, room, str(device))
-    review = await review_question(body.text, queue, talk)
+        return caption_talk(db, room), read_queue(db, room, device)
+
+
+def store_check(room: str, talk: str, device: str, text: str, seq: int | None) -> None:
+    identity = (room, talk, device, hashlib.sha256(text.encode()).hexdigest())
     with database() as db:
         db.execute(
             "DELETE FROM checked_captions WHERE room=? AND talk=? AND device=? AND text=?",
-            (room, talk, str(device), hashlib.sha256(body.text.encode()).hexdigest()),
+            identity,
         )
-        if review.segment is not None:
-            db.execute(
-                "INSERT INTO checked_captions VALUES (?,?,?,?,?)",
-                (
-                    room,
-                    talk,
-                    str(device),
-                    hashlib.sha256(body.text.encode()).hexdigest(),
-                    review.segment,
-                ),
-            )
+        if seq is not None:
+            db.execute("INSERT INTO checked_captions VALUES (?,?,?,?,?)", (*identity, seq))
+
+
+@router.post("/{room}/questions/check")
+async def check_question(room: Room, device: Device, body: Check) -> Review:
+    talk, queue = await asyncio.to_thread(check_context, room, str(device))
+    review = await review_question(body.text, queue, talk)
+    await asyncio.to_thread(store_check, room, talk, str(device), body.text, review.segment)
     return review
 
 

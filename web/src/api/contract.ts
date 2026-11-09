@@ -3,6 +3,7 @@
 // regenerate; don't edit or redefine them here.
 
 export type { Bullet, CatchUp } from '@/types/generated/catchup'
+export type { CapturePosition } from '@/types/generated/capture_position'
 export type { Health } from '@/types/generated/health'
 export type { DemoGroup, DemoDetail } from '@/types/generated/demo_group'
 export type { DemoContribution } from '@/types/generated/demo_contribution'

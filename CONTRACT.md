@@ -156,7 +156,8 @@ A group has `{id,text,lang,votes,voted,mine,translation,segment,expansions,formu
 | GET | `/api/talks/{talk_id}` | none | | `Talk` |
 | POST | `/api/talks/{talk_id}/start` | speaker | | `Talk` (status `live`) |
 | POST | `/api/talks/{talk_id}/stop` | speaker | | `Talk` (status `ended`) |
-| POST | `/api/talks/{talk_id}/audio` | speaker | multipart: `file` (audio/webm), `seq` (int), `t_start` (float), `t_end` (float) | `202 {"seq": 12}` |
+| GET | `/api/talks/{talk_id}/capture` | speaker | | `200 {"seq": 2, "elapsed": 10.02}` gives the next sequence and the recorded end offset in seconds. `401` invalid token, `404` unknown talk, `409` talk is not live. |
+| POST | `/api/talks/{talk_id}/audio` | speaker | Multipart file (WebM/Opus or MP4), integer `seq`, offsets `t_start` and `t_end` in seconds, optional UTC timestamp `captured_at` | `202 {"seq": 12}` for accepted or duplicate sequences. `401` invalid token, `404` unknown talk, `409` talk is not live, `413` empty file or more than 2,000,000 bytes, `422` invalid fields, offsets or sequence. |
 | GET | `/api/talks/{talk_id}/segments?after_seq=N` | none | | `Segment[]` with `seq > N`, oldest first (omit `after_seq` for all) |
 | GET | `/api/talks/{talk_id}/events` | none | SSE, see below | stream |
 | POST | `/api/talks/{talk_id}/questions/check` | viewer | `{text, lang}` | `{covered: bool, matches: Match[]}` (top 3) |
@@ -173,7 +174,8 @@ Status codes: `401` bad or missing speaker token or internal token, `404` unknow
 ### Audio chunks
 - Send whatever `MediaRecorder` produces (webm/opus). No resampling needed.
 - **Restart `MediaRecorder` every 5 s** so each chunk is a complete file with its own header. Do not use `timeslice`.
-- The speaker page computes `t_start` and `t_end` from when each recorder started and stopped, relative to the Start tap.
+- Each chunk starts at the previous recorded end offset, beginning at zero. Only time spent recording a nonempty chunk advances the offset. The browser saves the next sequence and end offset together so reconnecting resumes the audio timeline.
+- The speaker can send `captured_at`, the time capture of that chunk ended on the room's clock. The segment carries this timestamp through SSE and history so caption delay can be measured across pauses.
 - The backend processes chunks in `seq` order per talk. If chunk N has not arrived or finished processing 10 s after chunk N+1 arrived, the backend skips N, emits no segment for it, and continues with N+1. A late N is discarded. Timing uses the server clock, and stopping a talk flushes any pending gap the same way.
 
 ## SSE stream: `GET /api/talks/{talk_id}/events`
@@ -195,7 +197,8 @@ Each event has an `event:` name and a JSON `data:` line.
 ## Lag (the Dash0 SLO)
 
 ```
-lag_seconds = (Date.now() + offset) - (talk.started_at + segment.t_end)
+audio_end_ms = segment.captured_at ? Date.parse(segment.captured_at) : Date.parse(talk.started_at) + segment.t_end * 1000
+lag_seconds = (Date.now() + offset - audio_end_ms) / 1000
 ```
 - The phone shows it as "live · 6.2s behind".
 - The phone reports it to Dash0 RUM as `roompass.caption.lag` (seconds) with attribute `talk.id`.

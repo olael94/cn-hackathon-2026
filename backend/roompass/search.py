@@ -42,6 +42,7 @@ MAPPINGS = {
         "text_es": {"type": "text", "analyzer": "spanish"},  # BM25 with Spanish stemming
         "semantic": {"type": "semantic_text", "inference_id": INFERENCE_ID},  # vector search
         "emitted_at": {"type": "date"},
+        "captured_at": {"type": "date"},
     },
     "questions": {
         "id": {"type": "keyword"},
