@@ -14,8 +14,8 @@ import './questions.css'
 
 type Segment = { id: number; time: string; en: string; es: string }
 const samples = [
-  'Si se corta mi conexión, ¿puedo recuperar los subtítulos?',
-  '¿Cuánto historial recupero si vuelvo veinte minutos después?',
+  'Can I recover missed captions when I reconnect?',
+  'If I reconnect after twenty minutes, how much caption history can I recover?',
 ]
 
 export function Questions({
@@ -32,7 +32,7 @@ export function Questions({
   const [open, setOpen] = useState(false)
   const [mineOnly, setMineOnly] = useState(false)
   const [draft, setDraft] = useState('')
-  const [lang, setLang] = useState<'es' | 'en'>('es')
+  const [lang, setLang] = useState<'es' | 'en'>('en')
   const [review, setReview] = useState<Review | null>(null)
   const [target, setTarget] = useState('')
   const [busy, setBusy] = useState(false)
@@ -274,8 +274,8 @@ export function Questions({
                         setLang(e.target.value === 'en' ? 'en' : 'es')
                       }
                     >
-                      <option value="es">Español</option>
                       <option value="en">English</option>
+                      <option value="es">Spanish</option>
                     </select>
                   </div>
                   <textarea
@@ -296,7 +296,7 @@ export function Questions({
                         key={sample}
                         onClick={() => {
                           setDraft(sample)
-                          setLang('es')
+                          setLang('en')
                         }}
                       >
                         {i ? 'Use sample follow-up' : 'Use sample question'}

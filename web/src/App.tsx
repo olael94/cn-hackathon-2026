@@ -145,7 +145,6 @@ function Header({ room, speaker }: { room: Room; speaker: boolean }) {
 }
 
 function CaptionFeed({ room, language }: { room: Room; language: Language }) {
-  const other = language === 'en' ? 'es' : 'en'
   const current = room.latest
   return (
     <section className="feed" aria-label="Caption stream">
@@ -154,7 +153,7 @@ function CaptionFeed({ room, language }: { room: Room; language: Language }) {
           <Captions />
           Caption stream
         </h2>
-        <span className="meta">Sample replay · EN / ES</span>
+        <span className="meta">Sample replay · {language === 'en' ? 'English' : 'Spanish'}</span>
       </div>
       <div role="log" aria-live="polite" aria-relevant="additions text">
         {current ? (
@@ -172,10 +171,6 @@ function CaptionFeed({ room, language }: { room: Room; language: Language }) {
             <p className="main-line" lang={language}>
               {current[language]}
             </p>
-            <div className="translation">
-              <span className="language-mark">{other.toUpperCase()}</span>
-              <p lang={other}>{current[other]}</p>
-            </div>
           </article>
         ) : (
           <div className="latest waiting">
@@ -206,9 +201,6 @@ function CaptionFeed({ room, language }: { room: Room; language: Language }) {
                   <div>
                     <p className="history-primary" lang={language}>
                       {line[language]}
-                    </p>
-                    <p className="history-secondary" lang={other}>
-                      {line[other]}
                     </p>
                   </div>
                 </li>
@@ -289,10 +281,10 @@ function readSettings() {
 
 export default function App() {
   const speaker = location.pathname.replace(/\/$/, '') === '/speaker'
-  const room = useDemoRoom(speaker)
+  const [settings, setSettings] = useState(readSettings)
+  const room = useDemoRoom(speaker, settings.language)
   const questions = useQuestions()
   const health = useHealth()
-  const [settings, setSettings] = useState(readSettings)
   const [mobileQuestions, setMobileQuestions] = useState(false)
   const { language, light, size } = settings
   useEffect(() => {

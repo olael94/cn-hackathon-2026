@@ -45,27 +45,14 @@ def read_queue(db: sqlite3.Connection, room: str, device: str) -> list[Group]:
     details: dict[str, Detail] = {}
     parents: dict[str, str] = {}
     supporters: dict[str, set[str]] = {}
-    for key, original, english, segment, count in (
-        (
-            "latency",
-            "¿Cómo se mide el retraso de los subtítulos?",
-            "How is caption delay measured?",
-            42,
-            2,
-        ),
-        (
-            "recovery",
-            "¿Se recuperan los subtítulos si pierdo la conexión?",
-            "Do captions catch up when I reconnect?",
-            41,
-            1,
-        ),
+    for key, question, segment, count in (
+        ("latency", "How is caption delay measured?", 42, 2),
+        ("recovery", "Do captions catch up when I reconnect?", 41, 1),
     ):
         groups[key] = Group(
             id=key,
-            text=original,
-            translation=english,
-            lang="es",
+            text=question,
+            lang="en",
             segment=segment,
             votes=count,
             mine=False,

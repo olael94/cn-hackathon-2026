@@ -27,6 +27,6 @@ class DemoContribution(BaseModel):
     request_id: UUID
     action: Action
     text: constr(pattern=r'\S', min_length=1, max_length=500) | None = None
-    lang: Lang | None = 'es'
+    lang: Lang | None = 'en'
     target: constr(max_length=64) | None = None
     segment: int | None = None

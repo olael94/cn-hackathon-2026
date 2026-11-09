@@ -34,7 +34,7 @@
         "en",
         "es"
       ],
-      "default": "es"
+      "default": "en"
     },
     "target": {
       "anyOf": [

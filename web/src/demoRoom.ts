@@ -73,7 +73,7 @@ function readSession(): Session | null {
   }
 }
 
-export function useDemoRoom(speaker: boolean) {
+export function useDemoRoom(speaker: boolean, language: 'en' | 'es') {
   const localOnly = useRef(false)
   const [session, setSession] = useState(readSession)
   const [previewStart, setPreviewStart] = useState(Date.now)
@@ -169,7 +169,7 @@ export function useDemoRoom(speaker: boolean) {
         ? visible
             .map(
               (line) =>
-                `${line.time}  #${line.id}\nEN  ${line.en}\nES  ${line.es}`,
+                `${line.time}  #${line.id}\n${line[language]}`,
             )
             .join('\n\n')
         : null,

@@ -102,7 +102,7 @@ def review_question(text: str, groups: list[Group]) -> Review:
         if parent:
             try:
                 passage = PASSAGES.get(parent.id)
-                context = str(passage["es"]) if passage else ""
+                context = str(passage["en"]) if passage else ""
                 result.suggestion = suggest_relation(parent.text, text, context)
             except (URLError, TimeoutError, ValueError, KeyError, IndexError):
                 pass
