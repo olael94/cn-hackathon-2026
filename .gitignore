@@ -37,3 +37,9 @@ recordings/
 .idea/
 .vscode/
 *.log
+
+# From the Radar cnh-starter template (repo is public)
+*kubeconfig*
+*.pem
+*.key
+npm-debug.log*

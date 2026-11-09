@@ -366,3 +366,14 @@ A schedule/agenda app is suggested by three sponsors (Sonar, Dash0, Radar). Crow
 - Current OpenAI model names for transcription and embeddings.
 - Prior art for "catch me up" in live in-person talks.
 - Exact Keychron model given away (estimated ~$70 to $100 value, 65% layout, white with red accents).
+
+---
+
+## 12. Radar starter (merged from skyhook-io/cnh-starter)
+
+This repo now includes the Radar AI SRE track starter: a hosted team vcluster, Argo CD GitOps
+(push to `main` deploys), and agent instructions for shipping through Radar Cloud's MCP server
+(`radar-cloud`). Those instructions are imported below and are the source of truth for
+deploying, debugging, canaries and the 5:30 story. Skills live in `.agents/skills/`.
+
+@AGENTS.md
