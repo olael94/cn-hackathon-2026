@@ -1,4 +1,4 @@
-# RoomPass — Frontend Design & Agent Implementation Spec
+# RoomPass: Frontend Design and Agent Implementation Spec
 
 **Aesthetic Direction:** Swiss Civic Signage (European train station split-flap boards + broadcast telemetry instruments).
 **Primary Mandate:** Zero generic AI tropes. RoomPass is an accessibility and real-time observability instrument for deaf/hard-of-hearing attendees, second-language listeners, and speakers. Every pixel must prioritize WCAG AAA contrast, tabular telemetry legibility, and one-handed mobile operation.
@@ -9,14 +9,34 @@
 
 1. **NO AI Visual Clichés:**
    - Never use purple/indigo/blue gradients, glowing neon shadows (`box-shadow: 0 0 20px...`), blurred background blobs, or glassmorphism (`backdrop-filter: blur()`).
-   - Never use sparkle icons (`✨`), robot icons, or magic wand icons anywhere—especially on the Q&A "Possibly Covered" match card. Elasticsearch performs deterministic hybrid search; present matches as factual **index citations**.
+   - Never use sparkle icons (`✨`), robot icons, or magic wand icons anywhere, especially on the Q&A "Possibly Covered" match card. Elasticsearch performs deterministic hybrid search; present matches as factual **index citations**.
 2. **Sharp Structural Geometry:**
    - Use crisp `1px solid` or `2px solid` borders for hierarchy.
    - Maximum border radius is `4px` (`--radius: 4px`) for buttons/inputs and `0px` or `4px` for structural cards. Never use pill-shaped cards (`rounded-2xl` / `rounded-3xl`).
 3. **Tabular Numerals Everywhere:**
    - Every timestamp (`12:04`), segment ID (`#042`), lag readout (`live · 1.4s behind`), similarity score (`0.89`), vote count, and countdown timer MUST use `--font-mono` with `font-variant-numeric: tabular-nums` so numbers never jitter horizontally during live updates.
-4. **Zero-Build / Static Architecture:**
-   - Deliver self-contained static HTML/CSS/JS served by FastAPI. Do not introduce heavy frontend build pipelines, Tailwind CDN scripts that block rendering, or complex state libraries.
+4. **Use the existing web stack:**
+   - Build in `web/` (Vite, React, strict TypeScript, Tailwind, shadcn/ui). Do not add a second static frontend or serve HTML from FastAPI.
+   - Map the tokens in section 2 onto the shadcn CSS variables in `web/src/index.css` (see the token map below). Register the extra tokens in `@theme inline` as `--color-<name>` so Tailwind classes like `border-ok` and `bg-danger-tint` work.
+   - The theme switch uses `data-theme` on `<html>`, not shadcn's `.dark` class. Put the `swiss` values in `:root` and the `swiss-light` values in `[data-theme="swiss-light"]`.
+   - The HTML in section 4 shows the look. Build each block as a React component with Tailwind classes, not inline styles. Keep radius classes at `rounded-lg` (`var(--radius)`) or smaller; `rounded-xl` is above 4px.
+
+### Token map
+
+| Design token | shadcn variable in `web/src/index.css` |
+|---|---|
+| `--bg` | `--background` |
+| `--text` | `--foreground` |
+| `--surface` | `--card`, `--popover` |
+| `--surface-raised` | `--muted`, `--secondary` |
+| `--text-muted` | `--muted-foreground` |
+| `--border` | `--border`, `--input` |
+| `--accent` | `--primary`, `--ring` |
+| `--accent-ink` | `--primary-foreground` |
+| `--danger` | `--destructive` |
+| `--radius` | `--radius` (4px) |
+| `--font-sans`, `--font-mono` | `--font-sans`, `--font-mono` in `@theme inline` (replace Geist) |
+| `--border-strong`, `--accent-tint`, `--ok`, `--ok-tint`, `--warn`, `--warn-tint`, `--danger-tint`, `--status-color`, `--caption-size` | No shadcn match: add as new variables |
 
 ---
 
@@ -225,7 +245,7 @@ Agents must embed this exact inline SVG in the top header of both the Attendee P
 
   <div style="display:flex; gap:10px;">
     <button type="button" style="flex:1; min-height:48px; background:var(--accent); color:var(--accent-ink); border:2px solid var(--border-strong); border-radius:var(--radius); font-family:var(--font-sans); font-weight:700; font-size:14px; cursor:pointer;">
-      Answered — Dismiss
+      Answered · Dismiss
     </button>
     <button type="button" style="min-height:48px; padding:0 16px; background:transparent; color:var(--text); border:2px solid var(--border-strong); border-radius:var(--radius); font-family:var(--font-sans); font-weight:700; font-size:14px; cursor:pointer;">
       Still ask →
@@ -281,93 +301,168 @@ Agents must embed this exact inline SVG in the top header of both the Attendee P
 
 ---
 
-## 5. Reference Vanilla JS Behaviors (Copy-Paste Ready for Agents)
+## 5. Reference React Behaviors (TypeScript, for `web/src/`)
 
-```javascript
-// 1. Update SLO Lag Pill & Header Badge Dot dynamically
-function updateLagBadge(lagSeconds) {
-  const badge = document.getElementById('slo-badge');
-  const dot = document.getElementById('slo-dot');
-  const text = document.getElementById('slo-text');
-  const root = document.documentElement;
+### 5.1 Lag badge
 
-  const formatted = lagSeconds.toFixed(1);
-  if (lagSeconds > 3.0) {
-    badge.style.background = 'var(--danger-tint)';
-    badge.style.borderColor = 'var(--danger)';
-    dot.style.background = 'var(--danger)';
-    root.style.setProperty('--status-color', 'var(--danger)');
-    text.textContent = `LAG · ${formatted}s behind`;
-  } else if (lagSeconds > 2.0) {
-    badge.style.background = 'var(--warn-tint)';
-    badge.style.borderColor = 'var(--warn)';
-    dot.style.background = 'var(--warn)';
-    root.style.setProperty('--status-color', 'var(--warn)');
-    text.textContent = `LIVE · ${formatted}s behind`;
-  } else {
-    badge.style.background = 'var(--ok-tint)';
-    badge.style.borderColor = 'var(--ok)';
-    dot.style.background = 'var(--ok)';
-    root.style.setProperty('--status-color', 'var(--ok)');
-    text.textContent = `LIVE · ${formatted}s behind`;
+Pure thresholds, then a component. It also sets `--status-color` on `<html>` so the header SVG dot follows the badge.
+
+```tsx
+import { useEffect } from 'react'
+import { cn } from '@/lib/utils'
+
+type LagLevel = 'ok' | 'warn' | 'danger'
+
+export function lagLevel(lagSeconds: number): LagLevel {
+  if (lagSeconds > 3.0) return 'danger'
+  if (lagSeconds > 2.0) return 'warn'
+  return 'ok'
+}
+
+const badgeStyles: Record<LagLevel, string> = {
+  ok: 'border-ok bg-ok-tint',
+  warn: 'border-warn bg-warn-tint',
+  danger: 'border-danger bg-danger-tint',
+}
+
+const dotStyles: Record<LagLevel, string> = {
+  ok: 'bg-ok',
+  warn: 'bg-warn',
+  danger: 'bg-danger',
+}
+
+export function LagBadge({ lagSeconds }: { lagSeconds: number }) {
+  const level = lagLevel(lagSeconds)
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--status-color', `var(--${level})`)
+  }, [level])
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={cn(
+        'inline-flex items-center gap-2 rounded-lg border-2 px-2.5 py-1.5 font-mono text-xs font-bold tabular-nums',
+        badgeStyles[level],
+      )}
+    >
+      <span className={cn('size-2', dotStyles[level])} />
+      {level === 'danger' ? 'LAG' : 'LIVE'} · {lagSeconds.toFixed(1)}s behind
+    </div>
+  )
+}
+```
+
+### 5.2 Caption size and Daylight contrast
+
+```tsx
+import { useEffect, useState } from 'react'
+
+const FONT_STEPS = ['1.25rem', '1.5rem', '1.75rem']
+
+export function useCaptionSettings() {
+  const [fontStep, setFontStep] = useState(0)
+  const [daylight, setDaylight] = useState(false)
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--caption-size', FONT_STEPS[fontStep])
+  }, [fontStep])
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = daylight ? 'swiss-light' : 'swiss'
+  }, [daylight])
+
+  return {
+    daylight,
+    nextFontSize: () => setFontStep((step) => (step + 1) % FONT_STEPS.length),
+    toggleDaylight: () => setDaylight((value) => !value),
+  }
+}
+```
+
+### 5.3 Speaker 3-second hold-to-stop
+
+A repeat `pointerdown` never starts a second timer, the pointer is captured so a small finger slide does not cancel the hold, and nothing resets after a confirmed stop.
+
+```tsx
+import { useEffect, useRef, useState, type PointerEvent } from 'react'
+
+const HOLD_MS = 3000
+
+export function useHoldToStop(onConfirmStop: () => void) {
+  const timer = useRef<number | null>(null)
+  const [progress, setProgress] = useState(0)
+  const [confirmed, setConfirmed] = useState(false)
+
+  useEffect(
+    () => () => {
+      if (timer.current !== null) clearInterval(timer.current)
+    },
+    [],
+  )
+
+  const cancel = () => {
+    if (timer.current === null) return
+    clearInterval(timer.current)
+    timer.current = null
+    setProgress(0)
+  }
+
+  const onPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    if (timer.current !== null || confirmed) return
+    event.currentTarget.setPointerCapture(event.pointerId)
+    const startedAt = performance.now()
+    const id = window.setInterval(() => {
+      const elapsed = performance.now() - startedAt
+      setProgress(Math.min(1, elapsed / HOLD_MS))
+      if (elapsed >= HOLD_MS) {
+        clearInterval(id)
+        timer.current = null
+        setConfirmed(true)
+        onConfirmStop()
+      }
+    }, 50)
+    timer.current = id
+  }
+
+  const remainingSeconds = (((1 - progress) * HOLD_MS) / 1000).toFixed(1)
+  const label = confirmed
+    ? 'DRAINING LAST SEGMENTS (5.0s)...'
+    : progress > 0
+      ? `HOLDING... ${remainingSeconds}s`
+      : 'HOLD 3.0s TO END TALK'
+
+  return {
+    progress,
+    label,
+    buttonProps: {
+      onPointerDown,
+      onPointerUp: cancel,
+      onPointerCancel: cancel,
+      onLostPointerCapture: cancel,
+      disabled: confirmed,
+    },
   }
 }
 
-// 2. Accessibility Controls (Font Size & Swiss Obsidian/Daylight Toggle)
-const FONT_STEPS = ['1.25rem', '1.5rem', '1.75rem'];
-let fontIdx = 0;
+export function HoldToStopButton({ onConfirmStop }: { onConfirmStop: () => void }) {
+  const hold = useHoldToStop(onConfirmStop)
 
-document.getElementById('btn-font')?.addEventListener('click', () => {
-  fontIdx = (fontIdx + 1) % FONT_STEPS.length;
-  document.documentElement.style.setProperty('--caption-size', FONT_STEPS[fontIdx]);
-});
-
-document.getElementById('btn-contrast')?.addEventListener('click', () => {
-  const html = document.documentElement;
-  const next = html.getAttribute('data-theme') === 'swiss-light' ? 'swiss' : 'swiss-light';
-  html.setAttribute('data-theme', next);
-});
-
-// 3. Speaker 3-Second Hold-to-Stop Logic
-function bindHoldToStop(onConfirmStop) {
-  const btn = document.getElementById('hold-stop-btn');
-  const fill = document.getElementById('hold-stop-fill');
-  const label = document.getElementById('hold-stop-label');
-  if (!btn) return;
-
-  let timer = null;
-  let startedAt = 0;
-  const HOLD_MS = 3000;
-
-  const cancel = () => {
-    if (timer) clearInterval(timer);
-    timer = null;
-    fill.style.width = '0%';
-    label.textContent = 'HOLD 3.0s TO END TALK';
-  };
-
-  btn.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    startedAt = performance.now();
-    timer = setInterval(() => {
-      const elapsed = performance.now() - startedAt;
-      const pct = Math.min(100, (elapsed / HOLD_MS) * 100);
-      const rem = Math.max(0, (HOLD_MS - elapsed) / 1000).toFixed(1);
-      fill.style.width = `${pct}%`;
-      label.textContent = `HOLDING... ${rem}s`;
-      if (elapsed >= HOLD_MS) {
-        clearInterval(timer);
-        timer = null;
-        label.textContent = 'DRAINING LAST SEGMENTS (5.0s)...';
-        btn.disabled = true;
-        onConfirmStop();
-      }
-    }, 50);
-  });
-
-  btn.addEventListener('pointerup', cancel);
-  btn.addEventListener('pointerleave', cancel);
-  btn.addEventListener('pointercancel', cancel);
+  return (
+    <button
+      type="button"
+      {...hold.buttonProps}
+      className="relative min-h-[54px] w-full touch-none select-none overflow-hidden rounded-lg border-2 border-danger bg-background font-mono text-sm font-bold text-danger"
+    >
+      <span
+        className="pointer-events-none absolute inset-y-0 left-0 bg-danger-tint"
+        style={{ width: `${hold.progress * 100}%` }}
+      />
+      <span className="relative">{hold.label}</span>
+    </button>
+  )
 }
 ```
 
