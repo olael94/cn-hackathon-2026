@@ -6,6 +6,7 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 ARG VITE_DASH0_ENDPOINT=
 ARG VITE_DASH0_AUTH_TOKEN=
+ARG VITE_APP_VERSION=dev
 RUN pnpm build
 
 FROM nginxinc/nginx-unprivileged:1.29-alpine

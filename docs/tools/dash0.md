@@ -29,8 +29,8 @@ Everything lives in `dash0/` and is applied with the Dash0 CLI. `.github/workflo
 
 | File | What it creates |
 |---|---|
-| `dash0/dashboard.yaml` | Dashboard "RoomPass health": late captions %, captions per minute, pipeline stage p95, pipeline errors, translate p95 by fallback, Q&A and themes p95, requests, server errors, server p95, uptime |
-| `dash0/alerts.yaml` | Check rules `CaptionsLate` (over 5% late for 30 s), `PipelineErrors`, `ServerErrors`, `PublicUrlDown`. They email the Default Notification Channel |
+| `dash0/dashboard.yaml` | Dashboard "RoomPass health". Top row "Is it OK?": late captions %, server error %, server p95, uptime % for the last hour, each green/orange/red. Then captions per minute and late %, pipeline error % and p95 per stage, translate p95 by fallback, Q&A/themes/catch-up p95, requests, server error % and p95 per service, uptime runs, and error % and p95 per route. Errors are always a share of requests. Latency leaves out the SSE caption stream, which stays open for the whole talk |
+| `dash0/alerts.yaml` | Check rules `CaptionsLate` (over 5% late for 30 s), `PipelineErrors`, `ServerErrors` (over 5% of a service's requests for 2 min), `PublicUrlDown`. They email the Default Notification Channel |
 | `dash0/slo.yaml` | The two SLOs above |
 | `dash0/uptime.yaml` | The uptime check on the public URL |
 
