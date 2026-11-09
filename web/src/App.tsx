@@ -17,12 +17,14 @@ import {
 import { Button } from '@/components/ui/button'
 import { Questions as QuestionsPanel } from '@/components/Questions'
 import { useQuestions } from '@/api/questions'
+import { demoRoom } from '@/api/demo'
 import SpeakerConsole from '@/components/SpeakerConsole'
 import { useDemoRoom } from '@/demoRoom'
 import { useHealth } from '@/api/client'
 
 type Room = ReturnType<typeof useDemoRoom>
 type Language = 'en' | 'es'
+const attendeeUrl = '/?room=' + encodeURIComponent(demoRoom)
 
 function Brand() {
   return (
@@ -81,7 +83,7 @@ function Brand() {
 
 function RoomPass() {
   return (
-    <div className="room-ticket" aria-label="Room 01, Main stage">
+    <div className="room-ticket">
       <div className="ticket-stub" aria-hidden="true">
         <Captions size={22} />
         <span>ROOMPASS</span>
@@ -89,7 +91,7 @@ function RoomPass() {
       <div className="ticket-face">
         <div>
           <span className="meta">ROOM</span>
-          <strong>01</strong>
+          <strong>{demoRoom}</strong>
         </div>
         <div className="ticket-bars" aria-hidden="true">
           {[2, 1, 3, 1, 2, 1, 4, 2, 1, 3, 1, 2, 2, 1, 3, 1, 1, 3].map(
@@ -116,7 +118,7 @@ function Header({ room, speaker }: { room: Room; speaker: boolean }) {
     <>
       <header className={`masthead signal-${level}`}>
         <div className="shell head-inner">
-          <a href="/" className="brand">
+          <a href={attendeeUrl} className="brand">
             <Brand />
           </a>
           <div className="head-location">
@@ -324,6 +326,11 @@ export default function App() {
                 <Mic />
                 Miguel Elizalde
               </span>
+              {speaker && (
+                <a href={attendeeUrl} target="_blank" rel="noreferrer">
+                  Open attendee view
+                </a>
+              )}
             </div>
           </div>
           <RoomPass />

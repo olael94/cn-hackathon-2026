@@ -257,9 +257,14 @@ h1 {
   margin: 9px 0 14px;
 }
 .session-info {
+  flex-wrap: wrap;
   gap: 18px;
   font-size: 0.94rem;
   color: var(--muted-foreground);
+}
+.session-info a {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }
 .session-info span {
   gap: 7px;
@@ -318,8 +323,7 @@ h1 {
 }
 .ticket-face strong {
   display: block;
-  font: 700 3.45rem/0.93 var(--font-mono);
-  letter-spacing: -0.12em;
+  font: 700 1.4rem/1.2 var(--font-mono);
 }
 .ticket-face .meta {
   font-weight: 700;
@@ -583,7 +587,7 @@ h2 {
     padding-inline: 9px;
   }
   .ticket-face strong {
-    font-size: 2.5rem;
+    font-size: 1rem;
   }
   .dock-title {
     display: none;
@@ -622,7 +626,7 @@ h2 {
     gap: 10px;
   }
   .room-ticket {
-    width: 70px;
+    width: 80px;
     height: 66px;
   }
   .ticket-stub,
@@ -638,7 +642,7 @@ h2 {
     font-size: 0.58rem;
   }
   .ticket-face strong {
-    font-size: 2rem;
+    font-size: 1rem;
   }
   .event-line {
     font-size: 0.58rem;
