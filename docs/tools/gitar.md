@@ -26,7 +26,9 @@ PRs 1 to 3 and #10 (flagd and translator manifests) had no findings. PR 1 was th
 | #13 | Quality | Themes endpoint status codes (`503`, empty set for an unknown talk) missing from CONTRACT.md | Taken. Fixed by @melizalde-ds in `5c53237`: both documented in CONTRACT.md |
 | #13 | Quality | Label model name hardcoded in `backend/roompass/themes/labels.py` | Taken. Fixed by @melizalde-ds in `5c53237`: `THEMES_LABEL_MODEL` env var, default `gpt-5.4-mini` |
 | #13 | Edge case | Capped neighbor search: off-topic or seed hits can push real neighbors out, so some themes never form | Taken. Fixed by @melizalde-ds in `5c53237`: search filtered to the on-topic question ids |
-| #14 | Bug | `[1m]` rate windows can return no data with a 1-minute SignalControl aggregation, leaving panels empty and the lag alert silent | Open |
+| #14 | Bug | `[1m]` rate windows can return no data with a 1-minute SignalControl aggregation, leaving panels empty and the lag alert silent | Taken. Fixed by @melizalde-ds in `8cb2d9a`: every window is `[2m]` |
+| #15 | Quality | Radar budget row mixed scopes: memory requests 1856Mi above limits 1152Mi, which Kubernetes can't allow | Taken. Fixed by @melizalde-ds in this PR: namespace and cluster totals stated separately |
+| #16 | Edge case | One-backend-pod rule skipped kustomize `replicas:` or `patches:` overrides in `deploy/kustomization.yaml` | Taken. Fixed by @melizalde-ds in `3c77b39`: trigger covers kustomization overrides |
 
 ## Rejected
 
@@ -36,5 +38,5 @@ None yet.
 
 | When (MT) | Problem | What we did |
 | --- | --- | --- |
-| 2026-11-09, 3:05 PM | Every PR (#8, #10, #11, #13, #14) shows `Rules: No rules evaluated`, although `.gitar/review/` has 6 files. Gitar treats `.gitar/review/` as review instructions (they work: findings quote HACK-03 and our contract rules). Rules are a separate feature: `.gitar/rules/*.md` with YAML frontmatter (`title`, `description`, `when`, `actions`), per https://docs.gitar.ai/features/rules.md. | Adding `.gitar/rules/` in a separate PR. |
+| 2026-11-09, 3:05 PM | Every PR (#8, #10, #11, #13, #14) shows `Rules: No rules evaluated`, although `.gitar/review/` has 6 files. Gitar treats `.gitar/review/` as review instructions (they work: findings quote HACK-03 and our contract rules). Rules are a separate feature: `.gitar/rules/*.md` with YAML frontmatter (`title`, `description`, `when`, `actions`), per https://docs.gitar.ai/features/rules.md. | PR #16 added 3 rules in `.gitar/rules/`. Gitar's review of #16 showed `Rules: 2/2 met`, the first PR with rules evaluated. |
 | 2026-11-09, 3:05 PM | `Auto-apply is off` on every PR, so Gitar only comments and never commits a fix. The track asks for a fix Gitar applied. | Turn it on per PR with the comment `gitar auto-apply:on`. |

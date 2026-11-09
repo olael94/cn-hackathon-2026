@@ -38,4 +38,4 @@ The pod's events showed readiness and liveness probes refused for the few second
 
 | When (MT) | Problem | What we did |
 | --- | --- | --- |
-| 2026-11-09, 3:00 PM | `top_resources` for the budget check (PR #10): the pre-installed pods' CPU limits already add up to 5750m, over the documented 4 CPU limit budget, so the quota probably doesn't count them. Not confirmed. | Treated our own Deployments' totals as the budget: requests 980m CPU / 1856Mi after PR #10, limits 2200m / 1152Mi in `team-the-mok-team`. |
+| 2026-11-09, 3:00 PM | `top_resources` for the budget check (PR #10): the pre-installed pods' CPU limits already add up to 5750m, over the documented 4 CPU limit budget, so the quota probably doesn't count them. Not confirmed. | Treated our own Deployments' totals as the budget. After PR #10, `team-the-mok-team` requests 450m CPU / 576Mi and limits 2200m / 1152Mi (from `deploy/*.yaml`). The whole cluster, pre-installed pods included, requests 980m / 1856Mi. |
