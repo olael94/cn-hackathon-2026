@@ -176,7 +176,7 @@ spec:
               plugin:
                 kind: PrometheusTimeSeriesQuery
                 spec:
-                  query: 100 * sum by (otel_span_name) (rate({otel_metric_name="dash0.spans", otel_span_name=~"pipeline\\..*", otel_span_status_code="ERROR"}[2m])) / sum by (otel_span_name) (rate({otel_metric_name="dash0.spans", otel_span_name=~"pipeline\\..*"}[2m]))
+                  query: 100 * (sum by (otel_span_name) (rate({otel_metric_name="dash0.spans", otel_span_name=~"pipeline\\..*", otel_span_status_code="ERROR"}[2m])) or 0 * sum by (otel_span_name) (rate({otel_metric_name="dash0.spans", otel_span_name=~"pipeline\\..*"}[2m]))) / sum by (otel_span_name) (rate({otel_metric_name="dash0.spans", otel_span_name=~"pipeline\\..*"}[2m]))
                   seriesNameFormat: "{{otel_span_name}}"
     chaosFlag:
       kind: Panel
@@ -248,7 +248,7 @@ spec:
               plugin:
                 kind: PrometheusTimeSeriesQuery
                 spec:
-                  query: 100 * sum by (service_name) (rate({otel_metric_name="dash0.spans", otel_span_kind="SERVER", otel_span_status_code="ERROR"}[2m])) / sum by (service_name) (rate({otel_metric_name="dash0.spans", otel_span_kind="SERVER"}[2m]))
+                  query: 100 * (sum by (service_name) (rate({otel_metric_name="dash0.spans", otel_span_kind="SERVER", otel_span_status_code="ERROR"}[2m])) or 0 * sum by (service_name) (rate({otel_metric_name="dash0.spans", otel_span_kind="SERVER"}[2m]))) / sum by (service_name) (rate({otel_metric_name="dash0.spans", otel_span_kind="SERVER"}[2m]))
                   seriesNameFormat: "{{service_name}}"
     serverLatency:
       kind: Panel
@@ -320,7 +320,7 @@ spec:
               plugin:
                 kind: PrometheusTimeSeriesQuery
                 spec:
-                  query: 100 * sum by (http_route) (rate({otel_metric_name="dash0.spans", otel_span_kind="SERVER", otel_span_status_code="ERROR", http_route!=""}[2m])) / sum by (http_route) (rate({otel_metric_name="dash0.spans", otel_span_kind="SERVER", http_route!=""}[2m]))
+                  query: 100 * (sum by (http_route) (rate({otel_metric_name="dash0.spans", otel_span_kind="SERVER", otel_span_status_code="ERROR", http_route!=""}[2m])) or 0 * sum by (http_route) (rate({otel_metric_name="dash0.spans", otel_span_kind="SERVER", http_route!=""}[2m]))) / sum by (http_route) (rate({otel_metric_name="dash0.spans", otel_span_kind="SERVER", http_route!=""}[2m]))
                   seriesNameFormat: "{{http_route}}"
   layouts:
     - kind: Grid
