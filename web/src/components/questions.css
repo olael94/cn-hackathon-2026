@@ -15,6 +15,40 @@
   align-items: center;
   gap: 0.65rem;
 }
+.qa-brief,
+.qa-followup,
+.qa-related {
+  margin-top: 0.65rem;
+}
+.qa-brief summary {
+  cursor: pointer;
+  color: var(--primary);
+  padding-block: 0.4rem;
+}
+.qa-brief strong,
+.qa-related {
+  display: block;
+  font-size: 0.85rem;
+}
+.qa-brief strong {
+  margin-top: 0.65rem;
+}
+.qa-brief blockquote,
+.qa-followup {
+  border-left: 2px solid var(--border);
+  padding-left: 0.65rem;
+}
+.qa-related select {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  background: var(--card);
+}
+.qa-samples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
 .qa-heading h2,
 .qa-dialog-heading h2 {
   margin: 0;

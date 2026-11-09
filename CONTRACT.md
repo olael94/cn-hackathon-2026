@@ -132,6 +132,16 @@ The 4 or 5 themes that cover most of the questions, for the speaker to answer in
 
 ## Endpoints
 
+The two-phone rehearsal uses the isolated `/api/demo/{room}/questions` routes. The room is six lowercase letters or digits and every call sends the viewer's `X-Device-Id` UUID. These routes share a queue between the attendee replay and the read-only speaker brief. They do not grant speaker controls.
+
+| Method | Suffix after `/questions` | Request | Response |
+|---|---|---|---|
+| GET | empty | none | Ranked groups for this device |
+| POST | `/check` | `{text}` | `{target,segment,source,score,suggestion}`. Missing matches are null. The replay uses the seeded segment number. The optional score is an Elasticsearch keyword score, and the optional suggestion is `support`, `expand` or `ask`. |
+| POST | empty | `{request_id,action,target?,text?,lang?,segment?}` | Updated ranked groups. Reuse the same request UUID for a retry. |
+
+A group has `{id,text,lang,votes,voted,mine,translation,segment,expansions,formulations}`. Translation and segment can be null. Expansions have `{id,text,lang,votes,voted}`. Formulations are the original wordings submitted in support of a group. An `ask` creates a group, `expand` adds a detail to a group, and `support` backs a group or detail. The group total counts distinct participating devices, including authors. The list sorts by votes, with the older question first on a tie. Missing targets return 404, invalid combinations 422, and more than three written contributions per minute per device per room return 429. The demo polls the personalized snapshot once per second. The live talk API below has its own SSE and search contracts.
+
 | Method | Path | Auth | Body | Returns |
 |---|---|---|---|---|
 | POST | `/api/talks` | none | `{title, speaker_name, room}` | `{talk: Talk, speaker_token}` (token is returned only here) |

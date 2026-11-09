@@ -16,10 +16,8 @@ import {
   Type,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  Questions as QuestionsPanel,
-  useQuestions,
-} from '@/components/Questions'
+import { Questions as QuestionsPanel } from '@/components/Questions'
+import { useQuestions } from '@/api/questions'
 import SpeakerConsole from '@/components/SpeakerConsole'
 import { useDemoRoom } from '@/demoRoom'
 import { useHealth } from '@/api/client'

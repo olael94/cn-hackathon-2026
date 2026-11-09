@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DemoGroup",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "\\S"
+    },
+    "lang": {
+      "type": "string",
+      "enum": [
+        "en",
+        "es"
+      ]
+    },
+    "votes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "voted": {
+      "type": "boolean"
+    },
+    "mine": {
+      "type": "boolean"
+    },
+    "translation": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "segment": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "expansions": {
+      "type": "array",
+      "items": {
+        "title": "DemoDetail",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "\\S"
+          },
+          "lang": {
+            "type": "string",
+            "enum": [
+              "en",
+              "es"
+            ]
+          },
+          "votes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "voted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "lang",
+          "votes",
+          "voted"
+        ],
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "formulations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    }
+  },
+  "required": [
+    "id",
+    "text",
+    "lang",
+    "votes",
+    "voted",
+    "mine"
+  ],
+  "additionalProperties": false
+}

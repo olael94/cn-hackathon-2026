@@ -5,6 +5,10 @@ regenerate; don't edit or redefine them here.
 """
 
 from roompass.generated.catchup import Bullet, CatchUp
+from roompass.generated.demo_check import DemoCheck
+from roompass.generated.demo_contribution import DemoContribution
+from roompass.generated.demo_group import DemoGroup, Expansion
+from roompass.generated.demo_review import DemoReview
 from roompass.generated.health import Health
 from roompass.generated.match import Match
 from roompass.generated.question import Question
@@ -15,6 +19,11 @@ from roompass.generated.themeset import Theme, ThemeSet
 __all__ = [
     "Bullet",
     "CatchUp",
+    "DemoCheck",
+    "DemoContribution",
+    "DemoGroup",
+    "DemoReview",
+    "Expansion",
     "Health",
     "Match",
     "Question",
