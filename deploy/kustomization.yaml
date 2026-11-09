@@ -9,6 +9,8 @@ resources:
   - service.yaml
   - httproute.yaml
   - backend.yaml
+  - translator.yaml
+  - flagd.yaml
 images:
   - name: web
     newName: ghcr.io/olael94/cn-hackathon-2026
