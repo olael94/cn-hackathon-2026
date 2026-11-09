@@ -146,10 +146,10 @@ The 4 or 5 themes that cover most of the questions, for the speaker to answer in
 | POST | `/api/talks/{talk_id}/questions/{question_id}/vote` | viewer | | `Question` (one vote per device, repeat votes are ignored) |
 | GET | `/api/talks/{talk_id}/questions` | none | | `Question[]`, most votes first |
 | GET | `/api/talks/{talk_id}/catchup?lang=en` | none | | `CatchUp` |
-| GET | `/api/talks/{talk_id}/themes` | none | | `ThemeSet` (empty `themes` until there are 2 related questions) |
+| GET | `/api/talks/{talk_id}/themes` | none | | `ThemeSet` (empty `themes` until there are 2 related questions, and for an unknown talk; `503` if Elasticsearch fails) |
 | GET | `/api/health` | none | | `{status, version}` (already built) |
 
-Status codes: `401` bad or missing speaker token, `404` unknown talk, `409` talk not live (audio or questions on a talk that isn't live), `429` more than 3 questions per minute from one device.
+Status codes: `401` bad or missing speaker token, `404` unknown talk, `409` talk not live (audio or questions on a talk that isn't live), `429` more than 3 questions per minute from one device, `503` a dependency (Elasticsearch) is unavailable.
 
 ### Audio chunks
 - Send whatever `MediaRecorder` produces (webm/opus). No resampling needed.
