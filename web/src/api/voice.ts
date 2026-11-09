@@ -58,10 +58,9 @@ export async function recordVoice(stream: MediaStream, id: string, fail: (messag
   const elapsed = () => position.elapsed + (performance.now() - anchor) / 1000
   let seq = position.seq
   let stopping = false
-  let lastUpload = Promise.resolve()
+  const uploads = new Set<Promise<void>>()
   let recorder: MediaRecorder
   let timer: number
-  let pending = 0
   let resolveStop: () => void
   const finished = new Promise<void>(resolve => { resolveStop = resolve })
 
@@ -90,18 +89,20 @@ export async function recordVoice(stream: MediaStream, id: string, fail: (messag
         body.set('seq', String(number))
         body.set('t_start', String(start))
         body.set('t_end', String(end))
-        pending++
-        lastUpload = lastUpload.then(async () => {
-          const res = await fetch(base + id + '/audio', {method:'POST', headers, body, signal: AbortSignal.timeout(12000)})
+        // The server orders captions by seq. A slow acknowledgement can overlap the next upload.
+        const upload = fetch(base + id + '/audio', {
+          method: 'POST', headers, body, signal: AbortSignal.timeout(12000),
+        }).then(res => {
           if (!res.ok) throw new Error('Upload failed')
         }).catch(() => {
           const message = 'A voice segment could not be sent. Check your connection.'
           if (stopping) fail(message)
           else abort(message)
-        }).finally(() => { pending-- })
+        }).finally(() => { uploads.delete(upload) })
+        uploads.add(upload)
       }
-      if (pending >= 3) abort('Connection too slow for voice capture. Reconnect to continue.')
-      if (stopping || !stream.active) void lastUpload.then(resolveStop)
+      if (uploads.size >= 3) abort('Connection too slow for voice capture. Reconnect to continue.')
+      if (stopping || !stream.active) void Promise.all(uploads).then(resolveStop)
       else capture()
     }
     recorder.start()
