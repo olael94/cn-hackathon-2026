@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
+import { demoPath, demoRoom as room, newId } from '@/api/demo'
 import type { DemoCheck, DemoContribution, DemoGroup, DemoReview } from '@/api/contract'
 
 const detail = z.object({
@@ -28,20 +29,6 @@ const review = z.object({
 export type Review = z.infer<typeof review>
 export type Action = DemoContribution['action']
 
-// getRandomValues also works on phones using a local HTTP address.
-export function newId() {
-  const data = crypto.getRandomValues(new Uint8Array(16))
-  data[6] = (data[6] & 15) | 64
-  data[8] = (data[8] & 63) | 128
-  const hex = Array.from(data, (n) => n.toString(16).padStart(2, '0')).join('')
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    hex.slice(12, 16),
-    hex.slice(16, 20),
-    hex.slice(20),
-  ].join('-')
-}
 let temporaryDevice: string | undefined
 function deviceId() {
   temporaryDevice ??= newId()
@@ -56,12 +43,7 @@ function deviceId() {
   return temporaryDevice
 }
 
-const room = new URLSearchParams(location.search).get('room') ?? 'k8s7fa'
-const path =
-  (import.meta.env.VITE_API_URL ?? '/api') +
-  '/demo/' +
-  encodeURIComponent(room) +
-  '/questions'
+const path = demoPath + '/questions'
 async function request<T>(
   suffix: string,
   schema: z.ZodType<T>,

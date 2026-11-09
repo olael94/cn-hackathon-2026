@@ -2,7 +2,10 @@
 
 ## Rehearse with two phones
 
-Open `/?room=demoen` on both phones and `/speaker?room=demoen` on the speaker's screen. All three devices must use the same server and room code. For a fresh queue, choose another six-character code made of lowercase letters or digits. The rehearsal starts with English captions, sample questions, and speaker notes.
+- Start the sample replay from the speaker console. Both phones wait for the speaker and follow the same caption timeline.
+- Reload one phone during playback to check catch-up. Hold the speaker's end control for three seconds and check that both phones finish on the same caption after the five-second drain.
+
+Open `/?room=demoen` on both phones and `/speaker?room=demoen` on the speaker's screen. All three devices must use the same server and room code. For a fresh queue, choose another six-character code made of lowercase letters or digits. Start the talk on the speaker's screen. When the second sample caption appears (12:04 on screen, ten seconds into playback), both phones have the citation for the Q&A rehearsal.
 
 | Time | On the device | On the speaker screen |
 |---|---|---|

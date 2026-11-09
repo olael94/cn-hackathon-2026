@@ -5,12 +5,14 @@ import { Button } from '@/components/ui/button'
 
 type SpeakerProps = {
   phase: 'waiting' | 'live' | 'draining' | 'ended'
-  onStart: (save: boolean) => void
+  ready: boolean
+  controlError: string | null
+  onStart: (save: boolean) => Promise<void>
   onStop: () => void
   onReset: () => void
 }
 
-function HoldToStop({ onConfirm }: { onConfirm: () => void }) {
+function HoldToStop({ onConfirm, disabled }: { onConfirm: () => void; disabled: boolean }) {
   const input = useRef<string | number | null>(null)
   const timer = useRef<number | undefined>(undefined)
   const [elapsed, setElapsed] = useState(0)
@@ -53,6 +55,7 @@ function HoldToStop({ onConfirm }: { onConfirm: () => void }) {
       <button
         type="button"
         aria-label="Hold to end talk"
+        disabled={disabled}
         aria-describedby="hold-help"
         className="relative flex min-h-14 touch-none select-none items-center justify-center gap-2 overflow-hidden rounded-lg border-2 border-destructive bg-background px-4 font-mono text-sm font-bold text-foreground tabular-nums"
         onPointerDown={(event) => {
@@ -104,6 +107,8 @@ function micError(error: unknown) {
 
 export default function SpeakerConsole({
   phase,
+  ready,
+  controlError,
   onStart,
   onStop,
   onReset,
@@ -187,7 +192,15 @@ export default function SpeakerConsole({
         { once: true },
       )
       setMicActive(true)
-      if (phase === 'waiting') onStart(save)
+      if (phase === 'waiting') {
+        try {
+          await onStart(save)
+        } catch {
+          releaseMic()
+          setMicActive(false)
+          setPending(false)
+        }
+      }
     } catch (failure) {
       if (request.current === attempt) {
         console.error('Microphone access failed', failure)
@@ -196,12 +209,6 @@ export default function SpeakerConsole({
     } finally {
       if (request.current === attempt) setPending(false)
     }
-  }
-
-  function endTalk() {
-    releaseMic()
-    setMicActive(false)
-    onStop()
   }
 
   const canConnect = phase === 'waiting' || (phase === 'live' && !micActive)
@@ -247,27 +254,28 @@ export default function SpeakerConsole({
             />
           </label>
         )}
-        {error && (
+        {(error || controlError) && (
           <Alert>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>{error || controlError}</AlertDescription>
           </Alert>
         )}
         {canConnect && (
           <Button
             className="primary-action min-h-12"
-            disabled={pending}
+            disabled={pending || !ready}
             onClick={connectMicrophone}
           >
             <Mic aria-hidden="true" />
             {pending ? 'Waiting for microphone…' : startLabel}
           </Button>
         )}
-        {phase === 'live' && <HoldToStop onConfirm={endTalk} />}
+        {phase === 'live' && <HoldToStop onConfirm={onStop} disabled={!ready} />}
         {phase === 'ended' && (
           <Button
             variant="outline"
             className="control min-h-12"
             onClick={onReset}
+            disabled={!ready}
           >
             Prepare another talk
           </Button>

@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
-import { z } from 'zod'
+import { useEffect, useState } from 'react'
+import { demoRoom } from '@/api/demo'
+import { useReplay } from '@/api/replay'
 
-// Local replay for the two UI clients until the room streaming service ships.
 export const captions = [
   {
     id: 40,
@@ -54,137 +54,64 @@ export const captions = [
   },
 ]
 
-const sessionSchema = z.object({
-  phase: z.enum(['waiting', 'live', 'draining', 'ended']),
-  started: z.number(),
-  stopped: z.number(),
-  save: z.boolean(),
-})
-type Session = z.infer<typeof sessionSchema>
-const roomKey = 'roompass.demo.session.v1'
-function readSession(): Session | null {
-  try {
-    const result = sessionSchema.safeParse(
-      JSON.parse(localStorage.getItem(roomKey) ?? 'null'),
-    )
-    return result.success ? result.data : null
-  } catch {
-    return null
-  }
-}
+const transcriptKey = 'roompass:demo:transcript:' + demoRoom
 
 export function useDemoRoom(speaker: boolean, language: 'en' | 'es') {
-  const localOnly = useRef(false)
-  const [session, setSession] = useState(readSession)
-  const [previewStart, setPreviewStart] = useState(Date.now)
-  const [now, setNow] = useState(Date.now)
-  const [online, setOnline] = useState(navigator.onLine)
-  const [disconnectedAt, setDisconnectedAt] = useState(Date.now)
-  const [resumedAt, setResumedAt] = useState(0)
-  useEffect(() => {
-    const tick = window.setInterval(() => setNow(Date.now()), 500)
-    const sync = (event: StorageEvent) => {
-      if (!localOnly.current && event.key === roomKey) setSession(readSession())
-    }
-    const offline = () => {
-      setDisconnectedAt(Date.now())
-      setOnline(false)
-    }
-    const resume = () => {
-      setResumedAt(Date.now())
-      setOnline(true)
-    }
-    window.addEventListener('storage', sync)
-    window.addEventListener('offline', offline)
-    window.addEventListener('online', resume)
-    return () => {
-      clearInterval(tick)
-      window.removeEventListener('storage', sync)
-      window.removeEventListener('offline', offline)
-      window.removeEventListener('online', resume)
-    }
-  }, [])
-
-  function update(next: Session) {
-    try {
-      localStorage.setItem(roomKey, JSON.stringify(next))
-      localOnly.current = false
-    } catch {
-      // Storage can be readable but reject writes. This tab owns the session until a write succeeds.
-      localOnly.current = true
-    }
-    setSession(next)
-    setNow(Date.now())
-  }
-
-  const preview = !speaker && !session
-  const start = session?.started ?? previewStart
-  const receivedUntil = online ? now : disconnectedAt
-  const elapsed = Math.max(0, receivedUntil - start)
-  const phase =
-    session?.phase === 'draining' && now >= session.stopped + 5000
-      ? 'ended'
-      : (session?.phase ?? (preview ? 'live' : 'waiting'))
-  const until = session?.stopped
-    ? Math.min(receivedUntil, session.stopped + 5000)
-    : receivedUntil
-  const count =
-    phase === 'waiting'
-      ? 0
-      : preview
-        ? 3 + Math.floor(elapsed / 8000)
-        : Math.max(0, 1 + Math.floor((until - start - 2000) / 8000))
+  const { state, control } = useReplay()
+  const [clockTick, setClockTick] = useState(0)
+  const [savedStart, setSavedStart] = useState(() => {
+    try { return localStorage.getItem(transcriptKey) } catch { return null }
+  })
+  const session = state.data
+  const disconnected = state.isError || state.fetchStatus === 'paused'
+  const now = session
+    ? session.server_ms + Math.max(0, clockTick - session.anchor)
+    : 0
+  const started = session?.started_ms ?? null
+  const stopped = session?.stopped_ms ?? null
+  const finish = stopped === null ? null : stopped + 5000
+  const phase: 'waiting' | 'live' | 'draining' | 'ended' = started === null ? 'waiting'
+    : finish === null ? 'live' : now < finish ? 'draining' : 'ended'
+  const until = Math.min(now, finish ?? Infinity)
+  const count = started === null ? 0 : Math.max(0, 1 + Math.floor((until - started - 2000) / 8000))
   const visible = captions.slice(0, count)
-  const lastArrival = preview
-    ? start + (visible.length - 3) * 8000
-    : start + 2000 + (visible.length - 1) * 8000
-  const ended = phase === 'ended' || (preview && count > captions.length)
-  const awaitingFreshSegment = resumedAt > start && lastArrival < resumedAt
-  const sampleComplete =
-    count > captions.length ||
-    (visible.length === captions.length && awaitingFreshSegment)
-  const latest = visible.at(-1)
-  const badge = !online
-    ? 'Reconnecting'
-    : ended
-      ? 'Talk ended'
-      : phase === 'waiting'
-        ? 'Waiting for speaker'
-        : sampleComplete
-          ? 'Sample complete'
-          : awaitingFreshSegment
-            ? 'Reconnecting'
-            : !latest
-              ? 'Waiting for first caption'
-              : null
+  const nextCaption = started !== null && count < captions.length ? started + 2000 + count * 8000 : Infinity
+  const nextChange = Math.min(nextCaption, finish !== null && now < finish ? finish : Infinity)
+  useEffect(() => {
+    if (!session || disconnected || phase === 'ended' || !Number.isFinite(nextChange)) return
+    const delay = nextChange - session.server_ms - (performance.now() - session.anchor)
+    const timer = window.setTimeout(() => setClockTick(performance.now()), Math.max(1, Math.ceil(delay)))
+    return () => clearTimeout(timer)
+  }, [session, disconnected, phase, nextChange])
+
+  const badge = disconnected ? 'Reconnecting'
+    : !session ? 'Connecting to room'
+    : phase === 'waiting' ? 'Waiting for speaker'
+    : phase === 'draining' ? 'Finishing captions'
+    : phase === 'ended' ? 'Talk ended'
+    : !count ? 'Waiting for first caption'
+    : now >= (started ?? 0) + 2000 + captions.length * 8000 ? 'Sample complete'
+    : null
+
+  async function start(save: boolean) {
+    const next = await control.mutateAsync('start')
+    const value = save ? String(next.started_ms) : null
+    setSavedStart(value)
+    try {
+      if (value) localStorage.setItem(transcriptKey, value)
+      else localStorage.removeItem(transcriptKey)
+    } catch { /* The download stays available during this visit. */ }
+  }
   return {
-    phase,
-    visible,
-    badge,
-    latest,
-    ended,
-    preview,
-    savedTranscript:
-      phase === 'ended' && session?.save
-        ? visible
-            .map(
-              (line) =>
-                `${line.time}  #${line.id}\n${line[language]}`,
-            )
-            .join('\n\n')
-        : null,
-    start: (save: boolean) =>
-      update({ phase: 'live', started: Date.now(), stopped: 0, save }),
-    stop: () => {
-      const active = localOnly.current ? session : (readSession() ?? session)
-      if (active?.phase === 'live')
-        update({ ...active, phase: 'draining', stopped: Date.now() })
-    },
-    reset: () =>
-      update({ phase: 'waiting', started: 0, stopped: 0, save: false }),
-    replay: () => {
-      setPreviewStart(Date.now())
-      setResumedAt(0)
-    },
+    phase, visible, badge, latest: visible.at(-1), start,
+    ready: Boolean(session) && !disconnected && !control.isPending,
+    controlError: control.isError
+      ? (control.error instanceof TypeError ? 'Could not reach the room. Check your connection and try again.' : control.error.message)
+      : null,
+    stop: () => control.mutate('stop'),
+    reset: () => control.mutate('reset'),
+    savedTranscript: speaker && phase === 'ended' && savedStart === String(started)
+      ? visible.map((line) => `${line.time}  #${line.id}\n${line[language]}`).join('\n\n')
+      : null,
   }
 }

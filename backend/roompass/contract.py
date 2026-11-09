@@ -8,6 +8,7 @@ from roompass.generated.catchup import Bullet, CatchUp
 from roompass.generated.demo_check import DemoCheck
 from roompass.generated.demo_contribution import DemoContribution
 from roompass.generated.demo_group import DemoGroup, Expansion
+from roompass.generated.demo_replay import DemoReplay
 from roompass.generated.demo_review import DemoReview
 from roompass.generated.health import Health
 from roompass.generated.match import Match
@@ -22,6 +23,7 @@ __all__ = [
     "DemoCheck",
     "DemoContribution",
     "DemoGroup",
+    "DemoReplay",
     "DemoReview",
     "Expansion",
     "Health",

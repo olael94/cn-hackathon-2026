@@ -1,43 +1,23 @@
 """Shared, single-replica Q&A store for the caption replay."""
 
 import hashlib
-import os
 import sqlite3
-import tempfile
 import time
-from collections.abc import Iterator
-from contextlib import closing, contextmanager
-from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException
-from fastapi import Path as PathParam
 
 from roompass.contract import DemoCheck as Check
 from roompass.contract import DemoContribution as Contribution
 from roompass.contract import DemoGroup as Group
 from roompass.contract import DemoReview as Review
 from roompass.contract import Expansion as Detail
+from roompass.demo_store import Room, database
 from roompass.qa_search import review_question
 
 router = APIRouter(prefix="/api/demo")
-Room = Annotated[str, PathParam(pattern="^[a-z0-9]{6}$")]
 Device = Annotated[UUID, Header(alias="X-Device-Id")]
-
-
-@contextmanager
-def database() -> Iterator[sqlite3.Connection]:
-    path = os.environ.get("ROOMPASS_DEMO_DB", str(Path(tempfile.gettempdir()) / "roompass-qa.db"))
-    with closing(sqlite3.connect(path, timeout=5)) as db, db:
-        db.row_factory = sqlite3.Row
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS contributions (
-                room TEXT, device TEXT, request TEXT, action TEXT, target TEXT,
-                text TEXT, lang TEXT, segment INTEGER, created REAL,
-                PRIMARY KEY (room, device, request)
-            )""")
-        yield db
 
 
 def read_queue(db: sqlite3.Connection, room: str, device: str) -> list[Group]:

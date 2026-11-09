@@ -12,7 +12,6 @@ import {
   MessageSquare,
   Mic,
   Radio,
-  RotateCcw,
   Type,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -208,12 +207,6 @@ function CaptionFeed({ room, language }: { room: Room; language: Language }) {
           </ol>
         </>
       )}
-      {room.ended && room.preview && (
-        <Button className="control" variant="outline" onClick={room.replay}>
-          <RotateCcw />
-          Replay sample
-        </Button>
-      )}
     </section>
   )
 }
@@ -340,6 +333,8 @@ export default function App() {
             {speaker && (
               <SpeakerConsole
                 phase={room.phase}
+                ready={room.ready}
+                controlError={room.controlError}
                 onStart={room.start}
                 onStop={room.stop}
                 onReset={room.reset}

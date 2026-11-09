@@ -4,12 +4,12 @@ import { Dialog } from 'radix-ui'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
-  newId,
   type Action,
   type Review,
   type useQuestions,
 } from '@/api/questions'
 import { captions } from '@/demoRoom'
+import { newId } from '@/api/demo'
 import './questions.css'
 
 type Segment = { id: number; time: string; en: string; es: string }

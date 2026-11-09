@@ -132,6 +132,10 @@ The 4 or 5 themes that cover most of the questions, for the speaker to answer in
 
 ## Endpoints
 
+The sample caption replay uses `GET /api/demo/{room}/replay` and returns `DemoReplay`. The revision starts at zero. Times are Unix milliseconds from the same server clock. A null start means waiting. The first sample arrives two seconds after start and subsequent samples every eight seconds. The replay freezes five seconds after stop.
+
+The demo speaker sends `POST /api/demo/{room}/replay/{start|stop|reset}?revision=N` with its private browser-generated UUID in `X-Speaker-Token`. The first start claims the replay for that browser until reset. Each successful change increments the revision and returns the new snapshot. A competing speaker receives 403, and an out-of-date revision or invalid transition receives 409. Reading the snapshot requires no token.
+
 The two-phone rehearsal uses the isolated `/api/demo/{room}/questions` routes. The room is six lowercase letters or digits and every call sends the viewer's `X-Device-Id` UUID. These routes share a queue between the attendee replay and the read-only speaker brief. They do not grant speaker controls.
 
 | Method | Suffix after `/questions` | Request | Response |
