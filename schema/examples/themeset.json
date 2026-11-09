@@ -1,0 +1,1 @@
+{ "talk_id": "k8s7fa", "themes": [ { "id": "th_3", "label": "Setting resource requests for autoscaling", "question_ids": ["q_8f2c1a", "q_1b9e04", "q_77ad20"], "top_question_id": "q_8f2c1a", "votes": 9 } ], "question_count": 14, "off_topic_count": 2, "built_at": "2026-11-09T21:08:00.000Z" }

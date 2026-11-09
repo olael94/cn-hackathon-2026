@@ -1,19 +1,11 @@
-import { z } from 'zod'
+// Shared shapes from CONTRACT.md. Import them from here, never from types/generated/ directly.
+// The types are generated from schema/*.json by scripts/gen-types.sh. Change the schema, then
+// regenerate; don't edit or redefine them here.
 
-export const themeSchema = z.strictObject({
-  id: z.string(),
-  label: z.string(),
-  question_ids: z.array(z.string()),
-  top_question_id: z.string(),
-  votes: z.number().int(),
-})
-export type Theme = z.infer<typeof themeSchema>
-
-export const themeSetSchema = z.strictObject({
-  talk_id: z.string(),
-  themes: z.array(themeSchema),
-  question_count: z.number().int(),
-  off_topic_count: z.number().int(),
-  built_at: z.iso.datetime(),
-})
-export type ThemeSet = z.infer<typeof themeSetSchema>
+export type { Bullet, CatchUp } from '@/types/generated/catchup'
+export type { Health } from '@/types/generated/health'
+export type { Match } from '@/types/generated/match'
+export type { Question } from '@/types/generated/question'
+export type { Segment } from '@/types/generated/segment'
+export type { Talk } from '@/types/generated/talk'
+export type { Theme, ThemeSet } from '@/types/generated/themeset'

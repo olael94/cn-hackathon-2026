@@ -16,6 +16,14 @@ spec:
       labels:
         app: app
     spec:
+      automountServiceAccountToken: false
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: app
       containers:
         - name: app
           image: web
@@ -25,6 +33,8 @@ spec:
           env:
             - name: TEAM_NAME
               value: "the-mok-team"
+            - name: BACKEND_URL
+              value: "http://backend.team-the-mok-team.svc.cluster.local"
           resources:
             requests:
               cpu: 100m

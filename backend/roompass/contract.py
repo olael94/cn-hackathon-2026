@@ -1,19 +1,25 @@
-from datetime import datetime
+"""Shared shapes from CONTRACT.md. Import them from here, never from generated/ directly.
 
-from pydantic import BaseModel
+The models are generated from schema/*.json by scripts/gen-types.sh. Change the schema, then
+regenerate; don't edit or redefine them here.
+"""
 
+from roompass.generated.catchup import Bullet, CatchUp
+from roompass.generated.health import Health
+from roompass.generated.match import Match
+from roompass.generated.question import Question
+from roompass.generated.segment import Segment
+from roompass.generated.talk import Talk
+from roompass.generated.themeset import Theme, ThemeSet
 
-class Theme(BaseModel):
-    id: str
-    label: str
-    question_ids: list[str]
-    top_question_id: str
-    votes: int
-
-
-class ThemeSet(BaseModel):
-    talk_id: str
-    themes: list[Theme]
-    question_count: int
-    off_topic_count: int
-    built_at: datetime
+__all__ = [
+    "Bullet",
+    "CatchUp",
+    "Health",
+    "Match",
+    "Question",
+    "Segment",
+    "Talk",
+    "Theme",
+    "ThemeSet",
+]

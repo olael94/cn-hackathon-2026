@@ -17,15 +17,29 @@ spec:
       labels:
         app: backend
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: backend
           image: backend
           ports:
             - name: http
               containerPort: 8000
+          env:
+            - name: TRANSLATOR_URL
+              value: http://translator
+            - name: FLAGD_HOST
+              value: flagd
+            - name: FLAGD_PORT
+              value: "8013"
           envFrom:
             - secretRef:
                 name: otel
+                optional: true
+            - secretRef:
+                name: openai
+                optional: true
+            - secretRef:
+                name: elastic
                 optional: true
           resources:
             requests:

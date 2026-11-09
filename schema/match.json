@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Match",
+  "type": "object",
+  "properties": {
+    "segment_id": { "type": "string" },
+    "seq": { "type": "integer", "minimum": 0 },
+    "t_start": { "type": "number" },
+    "text_en": { "type": "string" },
+    "text_es": { "type": ["string", "null"] },
+    "score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "keyword_hit": { "type": "boolean" }
+  },
+  "required": ["segment_id", "seq", "t_start", "text_en", "text_es", "score", "keyword_hit"],
+  "additionalProperties": false
+}

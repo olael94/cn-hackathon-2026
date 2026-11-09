@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CatchUp",
+  "type": "object",
+  "properties": {
+    "talk_id": { "type": "string" },
+    "lang": { "type": "string", "enum": ["en", "es"] },
+    "bullets": {
+      "type": "array",
+      "items": {
+        "title": "Bullet",
+        "type": "object",
+        "properties": {
+          "text": { "type": "string" },
+          "segment_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        },
+        "required": ["text", "segment_ids"],
+        "additionalProperties": false
+      }
+    },
+    "through_seq": { "type": "integer", "minimum": 0 },
+    "generated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["talk_id", "lang", "bullets", "through_seq", "generated_at"],
+  "additionalProperties": false
+}
