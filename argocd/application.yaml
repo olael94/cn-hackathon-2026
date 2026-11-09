@@ -5,16 +5,16 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: app
-  namespace: team-mok-team
+  namespace: team-the-mok-team
 spec:
-  project: team-mok-team
+  project: team-the-mok-team
   source:
     repoURL: https://github.com/olael94/cn-hackathon-2026.git
     targetRevision: main
     path: deploy
   destination:
     server: https://kubernetes.default.svc
-    namespace: team-mok-team
+    namespace: team-the-mok-team
   syncPolicy:
     automated:
       prune: true

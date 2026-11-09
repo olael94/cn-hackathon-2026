@@ -24,7 +24,7 @@ spec:
               containerPort: 8080
           env:
             - name: TEAM_NAME
-              value: "mok-team"
+              value: "the-mok-team"
           resources:
             requests:
               cpu: 100m
