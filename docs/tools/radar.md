@@ -22,6 +22,16 @@ The pod's events showed readiness and liveness probes refused for the few second
 
 **Status.** Fixed on branch `fix/nginx-dns-resolve`: a `resolver` line plus a variable in `proxy_pass`, so nginx looks up `backend` per request instead of once at startup. `BACKEND_URL` is now the full Service name, because nginx's resolver ignores DNS search domains. New `app` pods should show 0 restarts.
 
+### 2026-11-09: translator rejected every call after PR #19
+
+**What we saw.** After PR #19 (live captions) deployed at 4:04 PM MT, `diagnose` on Deployment `backend` returned one log line: `translator unavailable, local fallback: HTTPStatusError`. The pods were healthy and every deploy run had passed, so nothing looked broken from the outside.
+
+**How we found the cause.** `get_workload_logs` on `translator` with `grep` showed `POST /api/translate HTTP/1.1" 401 Unauthorized`. `get_changes` showed PR #19 had added env `TRANSLATOR_TOKEN` from `secretKeyRef: app-credentials/translator-token` (optional) to both Deployments. That Secret did not exist, so both sides had an empty token, and `pipeline.py` rejects every call when the expected token is empty.
+
+**Impact.** Spanish captions still worked through the local fallback, but the translator pod never did any work, so the chaos flag on it would have shown nothing in the demo.
+
+**Fix.** Created Secret `app-credentials` with a random `translator-token` in the Radar UI (outside git), then restarted both Deployments with `manage_workload`. A test talk at 4:12 PM MT returned EN and ES captions, and the translator logged `POST /api/translate HTTP/1.1" 200 OK` with no fallback warning in the backend.
+
 ## Checks (cluster audit)
 
 `get_cluster_audit` on `team-the-mok-team`: 7 findings, all medium, 0 high. Screenshot: [`../checks-before.webp`](../checks-before.webp).
