@@ -128,6 +128,21 @@ def contribute(room: Room, device: Device, body: Contribution) -> list[Group]:
         ).fetchone():
             return read_queue(db, room, author)
         queue = read_queue(db, room, author)
+        # Two phones can both finish classification before either one publishes.
+        # Resolve identical new questions or sibling follow-ups inside the write lock.
+        if body.text and body.action in ("ask", "expand"):
+            wording = " ".join(body.text.casefold().split())
+            for group in queue:
+                if body.action == "expand" and group.id != body.target:
+                    continue
+                items = [group, *group.expansions] if body.action == "ask" else group.expansions
+                duplicate = next(
+                    (item for item in items if " ".join(item.text.casefold().split()) == wording),
+                    None,
+                )
+                if duplicate:
+                    body = body.model_copy(update={"action": "support", "target": duplicate.id})
+                    break
         roots = {group.id for group in queue}
         targets = roots | {detail.id for group in queue for detail in group.expansions}
         if body.action == "ask" and body.target is not None:

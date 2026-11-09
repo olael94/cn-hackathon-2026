@@ -34,7 +34,6 @@ export function Questions({
   const [draft, setDraft] = useState('')
   const [lang, setLang] = useState<'es' | 'en'>('en')
   const [review, setReview] = useState<Review | null>(null)
-  const [target, setTarget] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -51,30 +50,39 @@ export function Questions({
     attempt.current.signature = ''
   }
 
-  async function check() {
+  async function submitDraft() {
     setBusy(true)
     setError('')
     try {
-      const result = await model.check(draft.trim())
-      setReview(result)
-      setTarget(result.target ?? '')
+      const route = review ?? (await model.check(draft.trim()))
+      setReview(route)
+      const cited = segments.find((line) => line.id === route.segment)
+      if (!review && cited) return
+      await publish(route)
     } catch (cause) {
       console.error(cause)
-      setError('Search is unavailable. You can still post your question.')
-      setReview({
-        target: null,
-        segment: null,
-        score: null,
-        source: 'replay',
-        suggestion: null,
-      })
-      setTarget('')
+      setError(cause instanceof Error ? cause.message : 'Please try again.')
     } finally {
       setBusy(false)
     }
   }
 
-  async function send(action: Action, parent?: string, text?: string) {
+  async function publish(route: Review) {
+    const action = route.target ? (route.suggestion ?? 'ask') : 'ask'
+    await send(
+      action,
+      action === 'ask' ? undefined : (route.target ?? undefined),
+      draft.trim(),
+      route.segment ?? undefined,
+    )
+  }
+
+  async function send(
+    action: Action,
+    parent?: string,
+    text?: string,
+    segment?: number,
+  ) {
     setBusy(true)
     setError('')
     const payload = {
@@ -82,11 +90,18 @@ export function Questions({
       target: parent,
       text,
       lang,
-      segment: citation?.id,
+      segment,
     }
-    const signature = JSON.stringify(payload)
+    const signature = text
+      ? JSON.stringify([text, lang])
+      : JSON.stringify(payload)
     if (attempt.current.signature !== signature)
       attempt.current = { signature, id: newId() }
+    const related = model.questions.find(
+      (group) =>
+        group.id === parent ||
+        group.expansions.some((detail) => detail.id === parent),
+    )
     try {
       await model.submit({ ...payload, request_id: attempt.current.id })
       setOpen(false)
@@ -96,8 +111,12 @@ export function Questions({
       setNotice(
         {
           ask: 'Question posted',
-          support: 'Support recorded',
-          expand: 'Follow-up added',
+          support: text
+            ? 'Someone already asked this. Your support has been counted.'
+            : 'Support recorded',
+          expand: related
+            ? `Follow-up added to “${related.text}”`
+            : 'Follow-up added.',
         }[action],
       )
     } catch (cause) {
@@ -255,28 +274,17 @@ export function Questions({
                 </Dialog.Close>
               </div>
               <Dialog.Description className="qa-description">
-                Check what the speaker and the room have already covered.
+                If the talk already covered this, you’ll see the caption first.
               </Dialog.Description>
-              {!review ? (
+              {!review || !citation ? (
                 <form
                   onSubmit={(e) => {
                     e.preventDefault()
-                    void check()
+                    void submitDraft()
                   }}
                 >
                   <div className="qa-language">
                     <label htmlFor={input}>Your question</label>
-                    <select
-                      aria-label="Question language"
-                      disabled={busy}
-                      value={lang}
-                      onChange={(e) =>
-                        setLang(e.target.value === 'en' ? 'en' : 'es')
-                      }
-                    >
-                      <option value="en">English</option>
-                      <option value="es">Spanish</option>
-                    </select>
                   </div>
                   <textarea
                     id={input}
@@ -285,30 +293,51 @@ export function Questions({
                     rows={3}
                     value={draft}
                     disabled={busy}
-                    onChange={(e) => setDraft(e.target.value)}
+                    onChange={(e) => {
+                      setDraft(e.target.value)
+                      setReview(null)
+                    }}
                   />
-                  <div className="qa-samples">
-                    {samples.map((sample, i) => (
-                      <button
-                        type="button"
-                        className="qa-example"
+                  <details>
+                    <summary className="qa-example">Question options</summary>
+                    <label className="qa-language">
+                      Language
+                      <select
                         disabled={busy}
-                        key={sample}
-                        onClick={() => {
-                          setDraft(sample)
-                          setLang('en')
+                        value={lang}
+                        onChange={(e) => {
+                          setLang(e.target.value === 'es' ? 'es' : 'en')
+                          setReview(null)
                         }}
                       >
-                        {i ? 'Use sample follow-up' : 'Use sample question'}
-                      </button>
-                    ))}
-                  </div>
+                        <option value="en">English</option>
+                        <option value="es">Spanish</option>
+                      </select>
+                    </label>
+                    <div className="qa-samples">
+                      {samples.map((sample, i) => (
+                        <button
+                          type="button"
+                          className="qa-example"
+                          disabled={busy}
+                          key={sample}
+                          onClick={() => {
+                            setReview(null)
+                            setDraft(sample)
+                            setLang('en')
+                          }}
+                        >
+                          {i ? 'Use sample follow-up' : 'Use sample question'}
+                        </button>
+                      ))}
+                    </div>
+                  </details>
                   <Button
                     className="qa-ask"
                     type="submit"
                     disabled={busy || !draft.trim()}
                   >
-                    {busy ? 'Checking…' : 'Check captions'}
+                    {busy ? 'Sending…' : 'Send question'}
                   </Button>
                 </form>
               ) : (
@@ -316,94 +345,26 @@ export function Questions({
                   <p className="qa-draft" lang={lang}>
                     {draft}
                   </p>
-                  {citation ? (
-                    <div className="qa-citation">
-                      <strong>Possibly covered at {citation.time}</strong>
-                      <blockquote lang="en">{citation.en}</blockquote>
-                      <small>
-                        {review.score === null
-                          ? 'Replay reference'
-                          : 'Keyword match · ' + review.score.toFixed(2)}
-                      </small>
-                    </div>
-                  ) : (
-                    <p className="qa-description">
-                      No matching caption available.
-                    </p>
-                  )}
-                  <label className="qa-related">
-                    Related room question
-                    <select
-                      value={target}
-                      disabled={busy}
-                      onChange={(e) => setTarget(e.target.value)}
-                    >
-                      <option value="">Choose a question (optional)</option>
-                      {model.questions.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.text}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {target && target === review.target && review.suggestion && (
-                    <p className="qa-description">
-                      {
-                        {
-                          support: 'These questions may need the same answer.',
-                          expand: 'This may add a new detail.',
-                          ask: 'This may be clearer as a separate question.',
-                        }[review.suggestion]
-                      }
-                    </p>
-                  )}
+                  <div className="qa-citation">
+                    <strong>Possibly covered at {citation.time}</strong>
+                    <blockquote lang="en">{citation.en}</blockquote>
+                  </div>
                   <div className="qa-actions">
-                    {target && (
-                      <>
-                        <Button
-                          disabled={busy}
-                          onClick={() =>
-                            void send('support', target, draft.trim())
-                          }
-                        >
-                          I want to know too
-                        </Button>
-                        <Button
-                          variant="outline"
-                          disabled={busy}
-                          onClick={() =>
-                            void send('expand', target, draft.trim())
-                          }
-                        >
-                          Add as follow-up
-                        </Button>
-                      </>
-                    )}
+                    <Button
+                      disabled={busy}
+                      onClick={() => {
+                        toggle(false)
+                        setNotice('Question resolved by the caption.')
+                      }}
+                    >
+                      This answers it
+                    </Button>
                     <Button
                       variant="outline"
                       disabled={busy}
-                      onClick={() => void send('ask', undefined, draft.trim())}
+                      onClick={() => void submitDraft()}
                     >
-                      Post separately
-                    </Button>
-                    {citation && (
-                      <Button
-                        variant="ghost"
-                        disabled={busy}
-                        onClick={() => toggle(false)}
-                      >
-                        This answers it
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      disabled={busy}
-                      onClick={() => {
-                        setReview(null)
-                        setError('')
-                      }}
-                    >
-                      Edit
+                      {busy ? 'Sending…' : 'Still ask'}
                     </Button>
                   </div>
                 </>
