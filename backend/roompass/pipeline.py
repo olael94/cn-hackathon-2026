@@ -27,11 +27,12 @@ import httpx
 from fastapi import APIRouter, File, Form, Header, HTTPException, Request, UploadFile
 from openai import AsyncOpenAI
 from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse
 
 from roompass import prompts, search
-from roompass.contract import Segment, Talk
+from roompass.contract import Segment, Talk, TranslateRequest, TranslateResponse
 
 log = logging.getLogger("roompass.pipeline")
 tracer = trace.get_tracer("roompass.pipeline")
@@ -66,16 +67,6 @@ class CreateTalkResponse(BaseModel):
 
 class AudioAccepted(BaseModel):
     seq: int
-
-
-class TranslateRequest(BaseModel):
-    text: str
-    source: str = "en"
-    target: str = "es"
-
-
-class TranslateResponse(BaseModel):
-    text: str
 
 
 # ---------- in-memory state per talk ----------
@@ -214,6 +205,7 @@ async def translate(text: str, talk_id: str, seq: int) -> str | None:
                 "segment.seq": seq,
                 "gen_ai.request.model": TEXT_MODEL,
                 "translator.remote": bool(TRANSLATOR_URL),
+                "translator.fallback": False,
             }
         )
         try:
@@ -236,6 +228,7 @@ async def translate(text: str, talk_id: str, seq: int) -> str | None:
             return await translate_local(text, "en", "es")
         except Exception as error:  # noqa: BLE001 - any failure means "no Spanish"
             span.record_exception(error)
+            span.set_status(Status(StatusCode.ERROR, type(error).__name__))
             log.warning("translate failed talk=%s seq=%s: %s", talk_id, seq, type(error).__name__)
             return None
 
@@ -251,10 +244,10 @@ async def flush(state: TalkState) -> None:
             seq = state.next_publish
             if seq in state.done:
                 segment = state.done.pop(seq)
-                state.arrived_at.pop(seq, None)
+                arrived = state.arrived_at.pop(seq, time.monotonic())
                 state.next_publish += 1
                 if segment is not None:
-                    await emit(state, segment)
+                    await emit(state, segment, time.monotonic() - arrived)
                 continue
             later = [t for s, t in state.arrived_at.items() if s > seq]
             if later and time.monotonic() - min(later) >= GAP_TIMEOUT_S:
@@ -265,13 +258,15 @@ async def flush(state: TalkState) -> None:
             return
 
 
-async def emit(state: TalkState, segment: Segment) -> None:
+async def emit(state: TalkState, segment: Segment, lag: float) -> None:
     with tracer.start_as_current_span("pipeline.publish") as span:
         span.set_attributes(
             {
                 "talk.id": segment.talk_id,
                 "segment.seq": segment.seq,
                 "sse.subscribers": len(state.subscribers),
+                "roompass.caption.lag": lag,
+                "roompass.caption.late": str(lag > 10).lower(),
             }
         )
         state.buffer.append(segment)
@@ -286,6 +281,7 @@ async def index_quietly(segment: Segment) -> None:
             await search.index_segment(segment)
         except Exception as error:  # noqa: BLE001 - captions already went out
             span.record_exception(error)
+            span.set_status(Status(StatusCode.ERROR, type(error).__name__))
             log.error("index failed talk=%s seq=%s", segment.talk_id, segment.seq)
 
 

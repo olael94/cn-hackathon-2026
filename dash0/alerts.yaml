@@ -1,0 +1,35 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: roompass-alerts
+  labels:
+    dash0.com/id: roompass-alerts
+  annotations:
+    dash0.com/notification-channel-ids: 94c7ec87-7c04-4ae4-92ab-e654392e5b04
+spec:
+  groups:
+    - name: RoomPass
+      rules:
+        - alert: CaptionsLate
+          expr: 100 * sum(rate({otel_metric_name="dash0.spans", otel_span_name="pipeline.publish", roompass_caption_late="true"}[2m])) / sum(rate({otel_metric_name="dash0.spans", otel_span_name="pipeline.publish", roompass_caption_late=~"true|false"}[2m])) > 5
+          for: 30s
+          annotations:
+            summary: More than 5% of captions are over 10 s behind
+            description: The backend is publishing captions more than 10 s after their audio arrived. Check the Pipeline stage p95 panel to see which stage is slow, and the translate fallback panel.
+        - alert: PipelineErrors
+          expr: sum by (otel_span_name) (rate({otel_metric_name="dash0.spans", otel_span_name=~"pipeline\\..*", otel_span_status_code="ERROR"}[5m])) > 0
+          for: 1m
+          annotations:
+            summary: "{{ $labels.otel_span_name }} is failing"
+            description: A caption pipeline stage is returning errors, so captions are missing on phones.
+        - alert: ServerErrors
+          expr: sum by (service_name) (rate({otel_metric_name="dash0.spans", otel_span_kind="SERVER", otel_span_status_code="ERROR"}[5m])) > 0.05
+          for: 2m
+          annotations:
+            summary: "{{ $labels.service_name }} is returning errors"
+            description: More than 3 server errors per minute.
+        - alert: PublicUrlDown
+          expr: sum(increase({otel_metric_name="dash0.synthetic_check.runs", dash0_check_name="RoomPass public URL", dash0_synthetic_check_outcome!="Healthy"}[5m])) > 1
+          annotations:
+            summary: The public RoomPass URL is failing its uptime check
+            description: https://the-mok-team.cnh.radarhq.io/api/health failed more than one check in 5 minutes.
