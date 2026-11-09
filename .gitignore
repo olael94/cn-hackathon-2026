@@ -43,3 +43,9 @@ recordings/
 *.pem
 *.key
 npm-debug.log*
+
+# Agentic
+.serena
+.claude/settings.local.json
+.claude/worktrees/
+brag-output/
