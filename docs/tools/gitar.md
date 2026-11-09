@@ -35,6 +35,10 @@ PRs 1 to 3, #10 (flagd and translator manifests) and #18 (Radar audit fixes, `Ru
 | #19 | Bug | A stale `arrived_at` entry made stopping a talk wait 5 s | Taken. Fixed in PR #19 before merge |
 | #20 | Bug | Themes cache never refreshed, because nothing calls `note_question_change` yet, so the first `ThemeSet` stayed for the whole talk | Taken. Fixed by @melizalde-ds in `7c4f8c5`: rebuild when the cached set is older than 60 seconds |
 | #20 | Quality | `.env.example` set `THEMES_LABEL_MODEL=gpt-5.4-mini`, a second copy of the code default | Taken. Fixed by @melizalde-ds in `7c4f8c5`: value left empty, and an empty value falls back to the default |
+| #19 | Bug | After a pod restart, phones reconnecting at once each built their own talk state, so all but the last stopped getting captions with no error | Taken. Fixed via Gitar in `401ee01`: re-check after the Elasticsearch reads so every loader shares one state |
+| #19 | Security | `POST /api/translate` was public with no token, an open proxy to our OpenAI key | Taken. Fixed via Gitar in `401ee01`: `X-Internal-Token` must match `TRANSLATOR_TOKEN` |
+| #19 | Edge case | A retried or late audio chunk left a stale entry, so every stop waited the full 5 s and the chunk was still transcribed at OpenAI cost | Taken. Fixed via Gitar in `401ee01`: chunks below the next publish seq are ignored before any work |
+| #19 | Quality | Contract sync rule: `TranslateRequest` and `TranslateResponse` lived only in `pipeline.py`, not in `contract.py` or `contract.ts` | Taken. Fixed by @melizalde-ds in `fix/translate-contract`: schemas in `schema/`, types generated for both sides |
 
 ## Rejected
 

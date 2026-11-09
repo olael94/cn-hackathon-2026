@@ -11,6 +11,8 @@ from roompass.generated.question import Question
 from roompass.generated.segment import Segment
 from roompass.generated.talk import Talk
 from roompass.generated.themeset import Theme, ThemeSet
+from roompass.generated.translate_request import TranslateRequest
+from roompass.generated.translate_response import TranslateResponse
 
 __all__ = [
     "Bullet",
@@ -22,4 +24,6 @@ __all__ = [
     "Talk",
     "Theme",
     "ThemeSet",
+    "TranslateRequest",
+    "TranslateResponse",
 ]
