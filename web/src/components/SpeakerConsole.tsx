@@ -103,6 +103,13 @@ function stopTracks(stream: MediaStream | null) {
   stream?.getTracks().forEach((track) => track.stop())
 }
 
+const tabCaptureOptions = {
+  video: { displaySurface: 'browser' },
+  audio: true,
+  systemAudio: 'exclude',
+  monitorTypeSurfaces: 'exclude',
+} as const
+
 function captureError(error: unknown, tabAudio: boolean) {
   if (tabAudio) return 'Select the video tab in desktop Chrome and turn on Share tab audio, then try again.'
   if (error instanceof DOMException && error.name === 'NotAllowedError') {
@@ -127,7 +134,7 @@ export default function SpeakerConsole({
   const voice = source !== 'sample'
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
-  const [sourceActive, setSourceActive] = useState(false)
+  const [sourceActive, setSourceActive] = useState<false | 'microphone' | 'tab' | 'shared'>(false)
   const [previousPhase, setPreviousPhase] = useState(phase)
   const stream = useRef<MediaStream | null>(null)
   const stopRecorder = useRef<(() => Promise<void>) | null>(null)
@@ -190,7 +197,7 @@ export default function SpeakerConsole({
         return
       }
       const media = tabAudio
-        ? await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: 'browser' }, audio: true })
+        ? await navigator.mediaDevices.getDisplayMedia(tabCaptureOptions)
         : await navigator.mediaDevices.getUserMedia({ audio: true })
       if (request.current !== attempt || phaseRef.current !== phase) {
         stopTracks(media)
@@ -201,15 +208,10 @@ export default function SpeakerConsole({
         .find((item) => item.readyState === 'live')
       if (!track) {
         stopTracks(media)
-        setError(tabAudio ? 'Choose a Chrome Tab and enable Share tab audio.' : 'Your microphone disconnected. Connect it and try again.')
+        setError(tabAudio ? 'No audio was shared. Choose the video under Chrome Tab, turn on Share tab audio, then click Share.' : 'Your microphone disconnected. Connect it and try again.')
         return
       }
       const screen = media.getVideoTracks()[0]
-      if (tabAudio && screen?.getSettings().displaySurface && screen.getSettings().displaySurface !== 'browser') {
-        stopTracks(media)
-        setError('Select the tab playing the video in the Chrome Tab list.')
-        return
-      }
       stream.current = media
       // The picker supplies a video track as well. Send only the selected audio track to the recorder.
       if (screen) screen.enabled = false
@@ -234,7 +236,7 @@ export default function SpeakerConsole({
         if (request.current !== attempt) { void stop(); return }
         stopRecorder.current = stop
       }
-      setSourceActive(true)
+      setSourceActive(tabAudio ? (screen?.getSettings().displaySurface === 'browser' ? 'tab' : 'shared') : 'microphone')
     } catch (failure) {
       if (request.current === attempt) {
         console.error('Audio capture failed', failure)
@@ -282,7 +284,10 @@ export default function SpeakerConsole({
           )}
           {phase === 'waiting' && t('Ready to start')}
           {phase === 'live' &&
-            (sourceActive ? (tabAudio ? t('Capturing tab audio') : voiceId ? t('Capturing your voice') : t('Microphone active')) : t('Audio source disconnected'))}
+            (sourceActive === 'tab' ? t('Capturing tab audio')
+              : sourceActive === 'shared' ? t('Capturing shared audio')
+              : sourceActive ? (voiceId ? t('Capturing your voice') : t('Microphone active'))
+              : t('Audio source disconnected'))}
           {phase === 'draining' && t('Finishing captions (5 s)')}
           {phase === 'ended' && t('Talk ended')}
         </div>
