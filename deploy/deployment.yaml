@@ -25,6 +25,8 @@ spec:
           env:
             - name: TEAM_NAME
               value: "the-mok-team"
+            - name: BACKEND_URL
+              value: "http://backend.team-the-mok-team.svc.cluster.local"
           resources:
             requests:
               cpu: 100m
