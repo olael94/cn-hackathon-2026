@@ -66,7 +66,7 @@ RoomPass defaults to **Swiss Civic Obsidian** (`data-theme="swiss"`), engineered
   --warn-tint: #2E1000;
   --danger: #FF006E;           /* Chaos / SLO Burn (> 3.0s) */
   --danger-tint: #330016;
-  --status-color: var(--text-muted);
+  --status-color: var(--ok);
 }
 
 [data-theme="swiss-light"] {
@@ -87,7 +87,7 @@ RoomPass defaults to **Swiss Civic Obsidian** (`data-theme="swiss"`), engineered
   --warn-tint: #FFEDD5;
   --danger: #D90429;
   --danger-tint: #FFE5EC;
-  --status-color: var(--text-muted);
+  --status-color: var(--ok);
 }
 
 :root {
@@ -149,24 +149,12 @@ Agents must embed this exact inline SVG in the top header of both the Attendee P
 
 ## 4. Core Component Specifications & HTML Blueprints
 
-### 4.1 Attendee status and caption lag
-
-Use the talk lifecycle and the existing SSE connection to drive a single status badge.
-
-| What the attendee is experiencing | Badge and caption feed |
-|---|---|
-| The speaker has not started | Show `Waiting for speaker`. |
-| The talk has started | Show `Waiting for first caption` until the first live, finalized segment arrives. Partials can appear immediately. |
-| Live captions are arriving | Show the delay of the latest live, finalized segment using the thresholds below. |
-| The connection drops or missed segments are replaying | Replace the entire lag readout with `Reconnecting`. Keep the transcript visible, resume from the last event ID and append missed segments once. Restore the lag readout on the first new live segment after replay. |
-| The talk has ended | After the five-second drain, show `Talk ended` and leave the final captions readable. |
-
+### 4.1 Header & User-Facing Dash0 SLO Lag Indicator
 - **Formula:** `lag = phone_receive_time - (started_at + t_end) + clock_offset` (from SSE `hello` event).
 - **Visual States:**
   - `lag <= 2.0s`: Healthy (`--ok` border & dot, text: `LIVE · 1.4s behind`)
   - `2.0s < lag <= 3.0s`: Degrading (`--warn` border & dot, text: `LIVE · 2.6s behind`)
-  - `lag > 3.0s`: Delayed segment (`--danger` border, `--danger-tint` background, text: `LAG · 4.8s behind`)
-- Dash0 evaluates the aggregate objective of p95 below 3.0 seconds across live segment measurements. The phone badge reports one segment. Exclude reconnect replay from live latency measurements.
+  - `lag > 3.0s`: SLO Burn (`--danger` border, `--danger-tint` background, text: `LAG · 4.8s behind`)
 - **Required Disclaimer:** Always show `"Machine captions · may contain errors"` directly below the header.
 
 ```html
@@ -175,7 +163,7 @@ Use the talk lifecycle and the existing SSE connection to drive a single status 
     <!-- Insert Live Pass SVG -->
   </div>
 
-  <!-- Example after a live segment. Use the state table above for other badge labels. -->
+  <!-- Live SLO Telemetry Readout -->
   <div id="slo-badge" class="mono" role="status" aria-live="polite" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; background:var(--ok-tint); border:2px solid var(--ok); color:var(--text); font-size:12px; font-weight:700; border-radius:var(--radius);">
     <span id="slo-dot" style="width:8px; height:8px; background:var(--ok); display:inline-block;"></span>
     <span id="slo-text">LIVE · 1.4s behind</span>
@@ -184,7 +172,7 @@ Use the talk lifecycle and the existing SSE connection to drive a single status 
 
 <div class="mono" style="display:flex; justify-content:space-between; padding:6px 14px; background:var(--surface-raised); border-bottom:1px solid var(--border); font-size:11px; color:var(--text-muted);">
   <span>MACHINE CAPTIONS · MAY CONTAIN ERRORS</span>
-  <span>Target: p95 &lt; 3.0s</span>
+  <span>SLO p95 &lt; 3.0s</span>
 </div>
 ```
 
@@ -231,17 +219,8 @@ Use the talk lifecycle and the existing SSE connection to drive a single status 
 </main>
 ```
 
-### 4.3 Asking, posting and voting
-
-An attendee opens Q&A, types a question in English or Spanish and submits it for matching.
-
-| Search result | Attendee action and outcome |
-|---|---|
-| No match | Offer `Post question`. On successful publication, announce `Question posted` and show it in the room list. |
-| Possible match | Show the citation below before publication. `Answered · Dismiss` closes the draft without posting. `Still ask` publishes the original question with the same confirmation and list update. |
-
-Keep the draft available if posting fails. Show the room's questions in descending vote count. Each device can vote once per question. Once a vote succeeds, show the updated count and mark that question as voted. Include the question filter in the planned attendee view. If time runs short, the filter is the third cut, after catch-up and the Moonshine swap.
-
+### 4.3 Typed Q&A Drawer & "Possibly Covered" Soft-Match Citation
+- **Rule:** When an attendee types a question (e.g., in Spanish) and Elasticsearch returns a soft match against existing segments (in English or Spanish), display the **Citation Card** before or alongside posting.
 - **Required Elements:**
   1. Timestamp (`Possibly covered at 12:04`)
   2. Exact matched caption line (`text_en` or `text_es`)
@@ -298,34 +277,22 @@ Keep the draft available if posting fails. Show the room's questions in descendi
 </nav>
 ```
 
-### 4.5 Speaker console and talk lifecycle
-
-1. The private speaker link opens the pre-talk screen. The speaker chooses whether to save the transcript (off by default), then selects `Start talk`. Request microphone access on that action.
-2. If access is denied, stay on the pre-talk screen and preserve the transcript choice. Show “Allow microphone access in your browser’s site settings, then try again” and a `Try microphone again` button. Enter the live console once permission is granted and audio capture starts.
-3. While live, show the question queue and a keyboard-focusable stop control. A continuous three-second hold using the primary pointer, Space or Enter confirms the stop once. Show linear progress and a countdown. Releasing early, moving focus away, losing window focus or cancelling the pointer resets progress.
-4. On confirmation, stop capturing audio and show `Finishing captions (5 s)` during the five-second drain. Keep incoming final captions visible. When the talk finishes, replace the drain status with `Talk ended`.
-
-Use the primary text color for the stop instruction and countdown. Use the danger color for the border and its tint for the progress fill. Text must reach at least 7:1 against both the resting background and the fill in each theme.
-
+### 4.5 Speaker Console: 3-Second Press-and-Hold Stop & Opt-In Toggle
+- **Rule:** A single tap must NEVER stop an active talk. The Stop button requires a continuous `3000ms` pointer hold with a deterministic linear progress bar.
 - **Speaker View Q&A:** Spanish questions submitted by attendees must render in **English (`text_en`)** on the speaker console, sorted by `votes` descending, with the original Spanish shown smaller underneath.
 - **Transcript Opt-In:** Single high-contrast checkbox/switch (`opt_in`) for saving the transcript.
 
 ```html
 <section aria-label="Speaker Broadcast Controls" style="padding:16px; background:var(--surface); border:2px solid var(--border-strong); border-radius:var(--radius); display:flex; flex-direction:column; gap:14px;">
   
-  <!-- Pre-talk view -->
+  <!-- Transcript Opt-in Row -->
   <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; font-weight:700; font-size:14px;">
     <span>Save talk transcript after session (Opt-In)</span>
     <input type="checkbox" id="opt-in-toggle" style="width:24px; height:24px; accent-color:var(--accent);" />
   </label>
 
-  <button type="button">Start talk</button>
-</section>
-
-<!-- Live view replaces the pre-talk controls -->
-<section aria-label="Live speaker controls">
-  <p id="stop-help">Hold the button, Space or Enter for three seconds. Release early to cancel.</p>
-  <button type="button" id="hold-stop-btn" aria-describedby="stop-help" class="mono" style="position:relative; overflow:hidden; min-height:54px; width:100%; background:var(--bg); color:var(--text); border:2px solid var(--danger); border-radius:var(--radius); font-weight:700; font-size:14px; cursor:pointer; user-select:none; -webkit-user-select:none; touch-action:none;">
+  <!-- 3-Second Press-and-Hold Stop Button -->
+  <button type="button" id="hold-stop-btn" class="mono" style="position:relative; overflow:hidden; min-height:54px; width:100%; background:var(--bg); color:var(--danger); border:2px solid var(--danger); border-radius:var(--radius); font-weight:700; font-size:14px; cursor:pointer; user-select:none; -webkit-user-select:none; touch-action:none;">
     <span id="hold-stop-fill" style="position:absolute; inset:0; width:0%; background:var(--danger-tint); pointer-events:none;"></span>
     <span id="hold-stop-label" style="position:relative; z-index:1;">HOLD 3.0s TO END TALK</span>
   </button>
@@ -338,23 +305,13 @@ Use the primary text color for the stop instruction and countdown. Use the dange
 
 ### 5.1 Lag badge
 
-The attendee view derives this display state from the lifecycle in §4.1. Only the live state carries a lag measurement. The header dot takes the badge color.
+Pure thresholds, then a component. It also sets `--status-color` on `<html>` so the header SVG dot follows the badge.
 
 ```tsx
 import { useEffect } from 'react'
 import { cn } from '@/lib/utils'
 
 type LagLevel = 'ok' | 'warn' | 'danger'
-type CaptionStatus =
-  | { kind: 'live'; lagSeconds: number }
-  | { kind: 'waiting' | 'firstCaption' | 'reconnecting' | 'ended' }
-
-const statusLabels = {
-  waiting: 'Waiting for speaker',
-  firstCaption: 'Waiting for first caption',
-  reconnecting: 'Reconnecting',
-  ended: 'Talk ended',
-}
 
 export function lagLevel(lagSeconds: number): LagLevel {
   if (lagSeconds > 3.0) return 'danger'
@@ -365,26 +322,20 @@ export function lagLevel(lagSeconds: number): LagLevel {
 const badgeStyles: Record<LagLevel, string> = {
   ok: 'border-ok bg-ok-tint',
   warn: 'border-warn bg-warn-tint',
-  danger: 'border-destructive bg-danger-tint',
+  danger: 'border-danger bg-danger-tint',
 }
 
 const dotStyles: Record<LagLevel, string> = {
   ok: 'bg-ok',
   warn: 'bg-warn',
-  danger: 'bg-destructive',
+  danger: 'bg-danger',
 }
 
-export function LagBadge({ status }: { status: CaptionStatus }) {
-  const level = status.kind === 'live' ? lagLevel(status.lagSeconds) : null
-  const label = status.kind === 'live'
-    ? `${level === 'danger' ? 'LAG' : 'LIVE'} · ${status.lagSeconds.toFixed(1)}s behind`
-    : statusLabels[status.kind]
+export function LagBadge({ lagSeconds }: { lagSeconds: number }) {
+  const level = lagLevel(lagSeconds)
 
   useEffect(() => {
-    const style = document.documentElement.style
-    const color = level === 'danger' ? '--destructive' : level ? `--${level}` : '--muted-foreground'
-    style.setProperty('--status-color', `var(${color})`)
-    return () => { style.removeProperty('--status-color') }
+    document.documentElement.style.setProperty('--status-color', `var(--${level})`)
   }, [level])
 
   return (
@@ -393,11 +344,11 @@ export function LagBadge({ status }: { status: CaptionStatus }) {
       aria-live="polite"
       className={cn(
         'inline-flex items-center gap-2 rounded-lg border-2 px-2.5 py-1.5 font-mono text-xs font-bold tabular-nums',
-        level ? badgeStyles[level] : 'border-input bg-card',
+        badgeStyles[level],
       )}
     >
-      <span className={cn('size-2', level ? dotStyles[level] : 'bg-muted-foreground')} />
-      {label}
+      <span className={cn('size-2', dotStyles[level])} />
+      {level === 'danger' ? 'LAG' : 'LIVE'} · {lagSeconds.toFixed(1)}s behind
     </div>
   )
 }
@@ -432,38 +383,36 @@ export function useCaptionSettings() {
 
 ### 5.3 Speaker 3-second hold-to-stop
 
-Mount this control while the talk is live. Its confirmation callback starts the drain. The console owns the five-second finishing status and the transition to the ended view in §4.5.
+A repeat `pointerdown` never starts a second timer, the pointer is captured so a small finger slide does not cancel the hold, and nothing resets after a confirmed stop.
 
 ```tsx
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent } from 'react'
 
 const HOLD_MS = 3000
 
 export function useHoldToStop(onConfirmStop: () => void) {
   const timer = useRef<number | null>(null)
-  const source = useRef<string | number | null>(null)
   const [progress, setProgress] = useState(0)
   const [confirmed, setConfirmed] = useState(false)
 
-  const cancel = useCallback(() => {
+  useEffect(
+    () => () => {
+      if (timer.current !== null) clearInterval(timer.current)
+    },
+    [],
+  )
+
+  const cancel = () => {
     if (timer.current === null) return
     clearInterval(timer.current)
     timer.current = null
-    source.current = null
     setProgress(0)
-  }, [])
+  }
 
-  useEffect(() => {
-    window.addEventListener('blur', cancel)
-    return () => {
-      window.removeEventListener('blur', cancel)
-      if (timer.current !== null) clearInterval(timer.current)
-    }
-  }, [cancel])
-
-  const begin = (input: string | number) => {
+  const onPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault()
     if (timer.current !== null || confirmed) return
-    source.current = input
+    event.currentTarget.setPointerCapture(event.pointerId)
     const startedAt = performance.now()
     const id = window.setInterval(() => {
       const elapsed = performance.now() - startedAt
@@ -478,26 +427,9 @@ export function useHoldToStop(onConfirmStop: () => void) {
     timer.current = id
   }
 
-  const onPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
-    if (!event.isPrimary || event.button !== 0) return
-    event.currentTarget.focus()
-    event.currentTarget.setPointerCapture(event.pointerId)
-    begin(event.pointerId)
-  }
-
-  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (event.key !== ' ' && event.key !== 'Enter') return
-    event.preventDefault()
-    if (!event.repeat) begin(event.key)
-  }
-
-  const release = (input: string | number) => {
-    if (source.current === input) cancel()
-  }
-
   const remainingSeconds = (((1 - progress) * HOLD_MS) / 1000).toFixed(1)
   const label = confirmed
-    ? 'Finishing captions (5 s)'
+    ? 'DRAINING LAST SEGMENTS (5.0s)...'
     : progress > 0
       ? `HOLDING... ${remainingSeconds}s`
       : 'HOLD 3.0s TO END TALK'
@@ -507,12 +439,9 @@ export function useHoldToStop(onConfirmStop: () => void) {
     label,
     buttonProps: {
       onPointerDown,
-      onPointerUp: (event: PointerEvent<HTMLButtonElement>) => release(event.pointerId),
-      onPointerCancel: (event: PointerEvent<HTMLButtonElement>) => release(event.pointerId),
-      onLostPointerCapture: (event: PointerEvent<HTMLButtonElement>) => release(event.pointerId),
-      onKeyDown,
-      onKeyUp: (event: KeyboardEvent<HTMLButtonElement>) => release(event.key),
-      onBlur: cancel,
+      onPointerUp: cancel,
+      onPointerCancel: cancel,
+      onLostPointerCapture: cancel,
       disabled: confirmed,
     },
   }
@@ -524,9 +453,8 @@ export function HoldToStopButton({ onConfirmStop }: { onConfirmStop: () => void 
   return (
     <button
       type="button"
-      aria-describedby="stop-help"
       {...hold.buttonProps}
-      className="relative min-h-[54px] w-full touch-none select-none overflow-hidden rounded-lg border-2 border-destructive bg-background font-mono text-sm font-bold tabular-nums text-foreground"
+      className="relative min-h-[54px] w-full touch-none select-none overflow-hidden rounded-lg border-2 border-danger bg-background font-mono text-sm font-bold text-danger"
     >
       <span
         className="pointer-events-none absolute inset-y-0 left-0 bg-danger-tint"
@@ -543,13 +471,6 @@ export function HoldToStopButton({ onConfirmStop }: { onConfirmStop: () => void 
 ## 6. Pre-PR Checklist for Coding Agents
 
 Before opening a pull request touching `phone` or `speaker` frontend files, verify:
-
-- [ ] Open the private speaker link, choose the transcript setting and select Start talk. Deny microphone access, follow the recovery instructions and retry. The choice persists and the talk goes live once capture starts.
-- [ ] Try a short tap and short Space and Enter presses. Release early, move focus or switch windows during a hold. Each cancellation resets progress and leaves the talk live. In separate runs, hold with the pointer, Space and Enter for three seconds each. Each run produces one stop, displays the five-second drain, receives final captions and shows Talk ended.
-- [ ] Post an unmatched question and verify the confirmation and list entry. For a Spanish question matching English captions, verify the timestamp, exact quote and score. Dismiss it and verify the list is unchanged. Repeat with Still ask and verify it appears once, with English above the original Spanish on the speaker console.
-- [ ] Vote for a question and try voting for it again on the same device. Verify one increment and descending vote order on both views. Exercise the attendee filter if retained for the demo.
-- [ ] Join before start, then start the talk. Check both waiting labels and that the first finalized live caption supplies the first lag value. Verify the badge at 2.0 s, at 3.0 s and above 3.0 s. Disconnect and reconnect with missed captions. Reconnecting replaces the stale value through replay. The first subsequent live segment restores the readout. Check the aggregate p95 separately in Dash0.
-- [ ] Measure stop text contrast in both themes against the idle background and the progress fill. The instruction and countdown must each reach 7:1 throughout the hold.
 - [ ] Zero gradients, blurs, rounded pills (`> 4px`), or sparkle icons exist in the diff.
 - [ ] All numeric indicators (`t_start`, `lag`, `score`, `votes`, countdowns) have the `.mono` class with `font-variant-numeric: tabular-nums`.
 - [ ] The `"MACHINE CAPTIONS · MAY CONTAIN ERRORS"` banner is visible without scrolling.
