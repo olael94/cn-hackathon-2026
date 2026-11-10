@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { z } from 'zod'
 import type { CapturePosition, Segment } from '@/api/contract'
 import { speakerToken } from '@/api/replay'
@@ -35,10 +35,56 @@ async function readPosition(id: string, headers: Record<string, string>, savedNe
   throw new Error('Open the browser that started this talk to capture voice.')
 }
 
-export function useVoiceCaptions(id?: string | null) {
+export function useVoiceCaptions(id: string | null | undefined, ended: boolean) {
   const [feed, setFeed] = useState<{id: string; lines: Segment[]; connected: boolean}>()
+  const talkEnded = useEffectEvent(() => ended)
   useEffect(() => {
     if (!id) return
+    const talkId = id
+    const history = new AbortController()
+    let newest = -1
+    let lastProgress = performance.now()
+    let loading = false
+    const received = new Set<number>()
+    function receive(rows: Segment[]) {
+      if (history.signal.aborted) return
+      const missing = rows.filter(row => row.talk_id === id && !received.has(row.seq))
+      if (!missing.length) return
+      for (const row of missing) {
+        received.add(row.seq)
+        newest = Math.max(newest, row.seq)
+      }
+      lastProgress = performance.now()
+      setFeed(previous => {
+        const lines = previous?.id === talkId ? previous.lines : []
+        const merged = [...lines, ...missing]
+        if (lines.length && missing[0].seq < lines[lines.length - 1].seq) merged.sort((a, b) => a.seq - b.seq)
+        return {id: talkId, connected: true, lines: merged}
+      })
+    }
+    async function catchUp() {
+      if (loading || history.signal.aborted) return
+      loading = true
+      const finalRead = talkEnded()
+      let cursor = newest
+      try {
+        const signal = AbortSignal.any([history.signal, AbortSignal.timeout(10000)])
+        for (;;) {
+          const response = await fetch(base + talkId + '/segments?after_seq=' + cursor, {cache: 'no-store', signal})
+          if (!response.ok) throw new Error('Caption history HTTP ' + response.status)
+          const rows = z.array(segment).parse(await response.json())
+          receive(rows)
+          const next = rows.at(-1)?.seq
+          if (rows.length < 1000 || next === undefined || next <= cursor) break
+          cursor = next
+        }
+        if (finalRead) window.clearInterval(timer)
+      } catch (error) {
+        if (!history.signal.aborted) console.warn('Caption history unavailable', error)
+      } finally {
+        loading = false
+      }
+    }
     const source = new EventSource(base + id + '/events')
     const connection = (connected: boolean) => setFeed(previous => ({
       id, connected, lines: previous?.id === id ? previous.lines : [],
@@ -46,15 +92,17 @@ export function useVoiceCaptions(id?: string | null) {
     source.onopen = () => connection(true)
     source.onerror = () => connection(false)
     source.addEventListener('segment', (event: MessageEvent<string>) => {
-      const line = segment.parse(JSON.parse(event.data))
-      if (line.talk_id !== id) return
-      setFeed(previous => {
-        const lines = previous?.id === id ? previous.lines : []
-        if (lines.length && lines[lines.length - 1].seq >= line.seq) return previous
-        return {id, connected: true, lines: [...lines, line]}
-      })
+      receive([segment.parse(JSON.parse(event.data))])
     })
-    return () => source.close()
+    // A proxy can leave an SSE connection open even after it stops delivering captions.
+    const timer = window.setInterval(() => {
+      if (talkEnded() || performance.now() - lastProgress >= 8000) void catchUp()
+    }, 5000)
+    return () => {
+      window.clearInterval(timer)
+      history.abort()
+      source.close()
+    }
   }, [id])
   return feed?.id === id ? feed : undefined
 }
