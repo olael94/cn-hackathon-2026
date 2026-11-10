@@ -228,6 +228,7 @@ export default function SpeakerConsole({
       if (request.current !== attempt) return
       if (id) {
         const stop = await recordVoice(new MediaStream([track]), id, message => {
+          if (request.current !== attempt) return
           releaseSource()
           setSourceActive(false)
           setPending(false)
@@ -287,7 +288,7 @@ export default function SpeakerConsole({
             (sourceActive === 'tab' ? t('Capturing tab audio')
               : sourceActive === 'shared' ? t('Capturing shared audio')
               : sourceActive ? (voiceId ? t('Capturing your voice') : t('Microphone active'))
-              : t('Audio source disconnected'))}
+              : t('Audio capture paused'))}
           {phase === 'draining' && t('Finishing captions (5 s)')}
           {phase === 'ended' && t('Talk ended')}
         </div>

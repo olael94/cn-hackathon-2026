@@ -64,6 +64,31 @@ export function voiceFormat() {
   return ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find(type => MediaRecorder.isTypeSupported(type))
 }
 
+async function uploadChunk(id: string, headers: Record<string, string>, body: FormData) {
+  // Retries keep the original seq and timestamp. The backend deduplicates by talk and seq.
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    let response: Response | undefined
+    try {
+      response = await fetch(base + id + '/audio', {
+        method: 'POST', headers, body, signal: AbortSignal.timeout(4000),
+      })
+    } catch (error) {
+      console.warn('Audio upload interrupted', id, body.get('seq'), attempt, error)
+    }
+    if (response?.ok) return
+    if (response) {
+      const {status} = response
+      console.warn('Audio upload rejected', id, body.get('seq'), attempt, status)
+      if (status === 401 || status === 403) throw new Error('Open the browser that started this talk to capture voice.')
+      if (status === 404 || status === 409) throw new Error('This talk is no longer available for audio uploads.')
+      if (status < 500 && status !== 408 && status !== 429) throw new Error('The caption service rejected this audio segment.')
+      if (attempt === 3) throw new Error('The caption service is temporarily unavailable. Reconnect to resume uploads.')
+    }
+    if (attempt < 3) await new Promise(resolve => window.setTimeout(resolve, 350 * attempt))
+  }
+  throw new Error('Audio upload paused after three attempts. Check your connection and reconnect.')
+}
+
 export async function recordVoice(stream: MediaStream, id: string, fail: (message: string) => void) {
   const mimeType = voiceFormat()
   if (!mimeType) throw new Error('This browser cannot record voice. Use Safari or Chrome.')
@@ -80,6 +105,7 @@ export async function recordVoice(stream: MediaStream, id: string, fail: (messag
   const clockAnchor = (sent + performance.now()) / 2
   let {seq, elapsed} = position
   let stopping = false
+  let failed = false
   const uploads = new Set<Promise<void>>()
   let recorder: MediaRecorder
   let stoppedAt: number | undefined
@@ -94,7 +120,8 @@ export async function recordVoice(stream: MediaStream, id: string, fail: (messag
   }
 
   function abort(message: string) {
-    if (stopping) return
+    if (failed) return
+    failed = true
     stopping = true
     window.clearTimeout(timer)
     stopChunk()
@@ -109,7 +136,7 @@ export async function recordVoice(stream: MediaStream, id: string, fail: (messag
     recorder.onerror = () => abort('Audio capture was interrupted. Reconnect the audio source.')
     recorder.onstop = () => {
       window.clearTimeout(timer)
-      if (chunks.length) {
+      if (chunks.length && !failed) {
         const endedAt = stoppedAt ?? performance.now()
         const start = elapsed
         elapsed += (endedAt - startedAt) / 1000
@@ -123,18 +150,12 @@ export async function recordVoice(stream: MediaStream, id: string, fail: (messag
         body.set('t_end', String(elapsed))
         body.set('captured_at', new Date(room.server_ms + endedAt - clockAnchor).toISOString())
         // The server orders captions by seq. A slow acknowledgement can overlap the next upload.
-        const upload = fetch(base + id + '/audio', {
-          method: 'POST', headers, body, signal: AbortSignal.timeout(12000),
-        }).then(res => {
-          if (!res.ok) throw new Error('Upload failed')
-        }).catch(() => {
-          const message = 'A voice segment could not be sent. Check your connection.'
-          if (stopping) fail(message)
-          else abort(message)
-        }).finally(() => { uploads.delete(upload) })
+        const upload = uploadChunk(id, headers, body)
+          .catch((error: Error) => abort(error.message))
+          .finally(() => { uploads.delete(upload) })
         uploads.add(upload)
       }
-      if (uploads.size >= 3) abort('Connection too slow for voice capture. Reconnect to continue.')
+      if (uploads.size > 3) abort('Connection too slow for voice capture. Reconnect to continue.')
       if (stopping || !stream.active) void Promise.all(uploads).then(resolveStop)
       else capture()
     }
