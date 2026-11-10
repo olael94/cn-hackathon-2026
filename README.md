@@ -12,7 +12,7 @@ Built for deaf and hard-of-hearing attendees, second-language listeners, and any
 
 | Feature | What you see |
 |---------|--------------|
-| Live captions | English and Spanish on your phone, with "live · 6.2s behind" |
+| Live captions | English and Spanish on your phone, with "live · 1.4s behind" |
 | Q&A soft match | Type a question; "Possibly covered at 12:04" shows the caption line and score, with a **Still ask** button. A Spanish question matches English captions. |
 | Speaker link | Start, press and hold 3 seconds to stop, questions sorted by votes |
 | Accessible | Font size, high contrast, screen reader labels, one-handed use, "machine captions, may contain errors" |
@@ -77,10 +77,10 @@ docs/      the full brief, sponsor tool notes, the Radar starter guide
 
 | Tool | What it does here |
 |------|-------------------|
-| Elasticsearch | Stores talks, segments and questions. Hybrid search (BM25 + multilingual semantic) powers cross-language Q&A matching. |
-| Dash0 | One trace per caption segment, audio to phone. Lag SLO (p95 under 10 s), real-user monitoring on the phone page. |
-| Radar | Runs on our team's Kubernetes cluster; deploys through Argo CD and Radar's MCP; AI investigations on real failures. |
-| Gitar | Every feature lands through a reviewed PR, with project review rules. |
+| [Elasticsearch](docs/tools/elasticsearch.md) | Stores talks, segments and questions. Hybrid search (BM25 + multilingual semantic) powers cross-language Q&A matching. |
+| [Dash0](docs/tools/dash0.md) | One trace per caption segment, audio to phone. Lag SLO (p95 under 10 s), real-user monitoring on the phone page. |
+| [Radar](docs/tools/radar.md) | Runs on our team's Kubernetes cluster; deploys through Argo CD and Radar's MCP; AI investigations on real failures. |
+| [Gitar](docs/tools/gitar.md) | Every feature lands through a reviewed PR, with project review rules. |
 
 ## Run it locally
 
