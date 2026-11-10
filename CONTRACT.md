@@ -132,13 +132,32 @@ The 4 or 5 themes that cover most of the questions, for the speaker to answer in
 
 ## Endpoints
 
+The speaker creates a talk with `POST /api/talks`, starts it with its private speaker token, then attaches the public talk ID to the room with `POST /api/demo/{room}/replay/start?revision=N&talk_id=ID`. The room verifies the talk token in `X-Live-Speaker-Token` and returns the public `voice_id` and start time. Attendees subscribe to that talk’s SSE stream. The speaker uploads independently decodable WebM/Opus or MP4 chunks using the talk token, saves its next sequence number on the device, and stops the live talk before closing the room clock. Older clients can still ask the room to provision a talk using `voice=true` and read its capture position at `GET /api/talks/{talk_id}/capture`.
+
+The sample caption replay uses `GET /api/demo/{room}/replay` and returns `DemoReplay`. The revision starts at zero. Times are Unix milliseconds from the same server clock. A null start means waiting. The first sample arrives two seconds after start and subsequent samples every eight seconds. The replay freezes five seconds after stop.
+
+The demo speaker sends `POST /api/demo/{room}/replay/{start|stop|reset}?revision=N` with its private browser-generated UUID in `X-Speaker-Token`. The first start claims the replay for that browser until reset. Each successful change increments the revision and returns the new snapshot. A competing speaker receives 403, and an out-of-date revision or invalid transition receives 409. Reading the snapshot requires no token.
+
+The two-phone rehearsal uses the isolated `/api/demo/{room}/questions` routes. The room is six lowercase letters or digits and every call sends the viewer's `X-Device-Id` UUID. These routes share a queue between the attendee replay and the read-only speaker brief. They do not grant speaker controls.
+
+For written contributions the server detects English or Spanish from the draft. Group and expansion `text` keep the original, `lang` carries the detected language, and `translation` carries the English rendering of Spanish. Groups also include `formulations_en` in the same order as `formulations`. If a draft needs language processing that is unavailable, check or submission can return 503 and the attendee can retry.
+
+| Method | Suffix after `/questions` | Request | Response |
+|---|---|---|---|
+| GET | empty | none | Ranked groups for this device |
+| POST | `/check` | `{text}` | `{target,segment,source,score,suggestion}`. Search uses the original wording and the current voice talk ID (or `rpdemo` for sample replay). A positive coverage decision returns the top caption sequence and its semantic score. The phone shows a citation only after that caption has arrived. The optional model suggests `support`, `expand` or `ask` independently. A failed search returns no citation. |
+| POST | empty | `{request_id,action,target?,text?,lang?,segment?}` | Updated ranked groups and the committed action in `X-Question-Action`. Reuse the same request UUID for a retry. |
+
+A group has `{id,text,lang,votes,voted,mine,translation,segment,expansions,formulations}`. Translation and segment can be null. Expansions have `{id,text,lang,votes,voted}`. Formulations are the original wordings submitted in support of a group. An `ask` creates a group, `expand` adds a detail to a group, and `support` backs a group or detail. The group total counts distinct participating devices, including authors. The list sorts by votes, with the older question first on a tie. Missing targets return 404, invalid combinations 422, and more than three written contributions per minute per device per room return 429. The demo polls the personalized snapshot once per second. The live talk API below has its own SSE and search contracts.
+
 | Method | Path | Auth | Body | Returns |
 |---|---|---|---|---|
 | POST | `/api/talks` | none | `{title, speaker_name, room}` | `{talk: Talk, speaker_token}` (token is returned only here) |
 | GET | `/api/talks/{talk_id}` | none | | `Talk` |
 | POST | `/api/talks/{talk_id}/start` | speaker | | `Talk` (status `live`) |
 | POST | `/api/talks/{talk_id}/stop` | speaker | | `Talk` (status `ended`) |
-| POST | `/api/talks/{talk_id}/audio` | speaker | multipart: `file` (audio/webm), `seq` (int), `t_start` (float), `t_end` (float) | `202 {"seq": 12}` |
+| GET | `/api/talks/{talk_id}/capture` | speaker | | `200 {"seq": 2, "elapsed": 10.02}` gives the next sequence and the recorded end offset in seconds. `401` invalid token, `404` unknown talk, `409` talk is not live. |
+| POST | `/api/talks/{talk_id}/audio` | speaker | Multipart file (WebM/Opus or MP4), integer `seq`, offsets `t_start` and `t_end` in seconds, optional UTC timestamp `captured_at` | `202 {"seq": 12}` for accepted or duplicate sequences. `401` invalid token, `404` unknown talk, `409` talk is not live, `413` empty file or more than 2,000,000 bytes, `422` invalid fields, offsets or sequence. |
 | GET | `/api/talks/{talk_id}/segments?after_seq=N` | none | | `Segment[]` with `seq > N`, oldest first (omit `after_seq` for all) |
 | GET | `/api/talks/{talk_id}/events` | none | SSE, see below | stream |
 | POST | `/api/talks/{talk_id}/questions/check` | viewer | `{text, lang}` | `{covered: bool, matches: Match[]}` (top 3) |
@@ -155,7 +174,8 @@ Status codes: `401` bad or missing speaker token or internal token, `404` unknow
 ### Audio chunks
 - Send whatever `MediaRecorder` produces (webm/opus). No resampling needed.
 - **Restart `MediaRecorder` every 5 s** so each chunk is a complete file with its own header. Do not use `timeslice`.
-- The speaker page computes `t_start` and `t_end` from when each recorder started and stopped, relative to the Start tap.
+- Each chunk starts at the previous recorded end offset, beginning at zero. Only time spent recording a nonempty chunk advances the offset. The browser saves the next sequence and end offset together so reconnecting resumes the audio timeline.
+- The speaker can send `captured_at`, the time capture of that chunk ended on the room's clock. The segment carries this timestamp through SSE and history so caption delay can be measured across pauses.
 - The backend processes chunks in `seq` order per talk. If chunk N has not arrived or finished processing 10 s after chunk N+1 arrived, the backend skips N, emits no segment for it, and continues with N+1. A late N is discarded. Timing uses the server clock, and stopping a talk flushes any pending gap the same way.
 
 ## SSE stream: `GET /api/talks/{talk_id}/events`
@@ -177,7 +197,8 @@ Each event has an `event:` name and a JSON `data:` line.
 ## Lag (the Dash0 SLO)
 
 ```
-lag_seconds = (Date.now() + offset) - (talk.started_at + segment.t_end)
+audio_end_ms = segment.captured_at ? Date.parse(segment.captured_at) : Date.parse(talk.started_at) + segment.t_end * 1000
+lag_seconds = (Date.now() + offset - audio_end_ms) / 1000
 ```
 - The phone shows it as "live · 6.2s behind".
 - The phone reports it to Dash0 RUM as `roompass.caption.lag` (seconds) with attribute `talk.id`.

@@ -52,6 +52,8 @@
 
 ## Requirements
 
+The [two-phone rehearsal](phase-03-qa-intent.md) exercises related questions, group ranking and the speaker brief.
+
 Copied from the brief's "Must ship".
 
 1. **Live captions** in EN and ES, with the lag on screen ("live · 6.2s behind").

@@ -52,6 +52,10 @@ PRs 1 to 3, #10 (flagd and translator manifests) and #18 (Radar audit fixes, `Ru
 | #24 | Bug | Chaos panel groups by `roompass.chaos`, which no span sets | Taken in part. Panel now splits by `translator.fallback`, which the code sets. Nothing reads the chaos flag yet: Open |
 | #27 | Quality | Probe and log findings from live Dash0 data had no entry in `docs/tools/dash0.md` (rule "Tool finding is logged" failed) | Taken. Two rows added under Tooling problems in `docs/tools/dash0.md` |
 | #27 | Edge case | Error % panels per stage, service and route show "No data" instead of 0% when a group has no errors | Taken. All three use `or 0 * sum by (...)` to keep a 0 line per group |
+| [#28](https://github.com/olael94/cn-hackathon-2026/pull/28#discussion_r4519361293) | Performance | “Sync SQLite calls block the event loop that serves captions” | Fixed in `8379c3d`. Tested with an exclusive database lock. The event loop kept running while question checks and replay writes waited. Verified Nov 9 at 4:55 PM MST. |
+| [#28](https://github.com/olael94/cn-hackathon-2026/pull/28#discussion_r4519361429) | Quality | “Routing model name is a hardcoded literal” | Fixed in `8379c3d`. Verified the configured model in the request and a warning on fallback, Nov 9 at 4:55 PM MST. |
+| [#28](https://github.com/olael94/cn-hackathon-2026/pull/28#discussion_r4519361548) | Bug | “Audio offsets come from the wall clock, not the audio” | Fixed in `8379c3d`. A browser resumed at 10 seconds of recorded audio after a simulated 125 seconds of talk time. Verified Nov 9 at 4:55 PM MST. |
+| [#28](https://github.com/olael94/cn-hackathon-2026/pull/28#discussion_r4519361674) | Quality | “CONTRACT.md missing new audio upload statuses and capture shape” | Fixed in `8379c3d`. Generated the capture response for both clients and verified HTTP 409, 413 and 422. Verified Nov 9 at 4:55 PM MST. |
 
 ## Rejected
 

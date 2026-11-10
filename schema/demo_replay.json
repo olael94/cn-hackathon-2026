@@ -1,0 +1,13 @@
+{
+  "title": "DemoReplay",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["revision", "server_ms", "started_ms", "stopped_ms"],
+  "properties": {
+    "voice_id": {"type": ["string", "null"]},
+    "revision": {"type": "integer", "minimum": 0},
+    "server_ms": {"type": "integer"},
+    "started_ms": {"type": ["integer", "null"]},
+    "stopped_ms": {"type": ["integer", "null"]}
+  }
+}

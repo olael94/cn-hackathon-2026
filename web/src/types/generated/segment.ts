@@ -11,6 +11,7 @@ export interface Segment {
   seq: number;
   t_start: number;
   t_end: number;
+  captured_at?: string | null;
   text_en: string;
   text_es: string | null;
   emitted_at: string;

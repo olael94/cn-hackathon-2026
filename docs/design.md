@@ -195,7 +195,7 @@ Render finalized `segment` events from the five-second audio chunks specified in
 - **Layout:** Single-column vertical feed with `padding-bottom: 96px` so the sticky bottom thumb bar never obscures the active caption line.
 - **Language Selection:**
   - Primary language selected by user (`EN` or `ES`) renders at `font-size: var(--caption-size); font-weight: 700; color: var(--text)`.
-  - Secondary language renders directly underneath at `font-size: calc(var(--caption-size) * 0.78); color: var(--text-muted)`.
+  - The rehearsal shows the selected language for both current and earlier captions. English is the default. The language control switches to Spanish on request.
 
 ```html
 <main id="caption-stream" role="log" aria-live="polite" aria-label="Live captions" style="padding:16px 14px 96px 14px; display:flex; flex-direction:column; gap:18px;">

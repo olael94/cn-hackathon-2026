@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DemoContribution",
+  "type": "object",
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "ask",
+        "expand",
+        "support"
+      ]
+    },
+    "text": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "pattern": "\\S"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "lang": {
+      "type": "string",
+      "enum": [
+        "en",
+        "es"
+      ],
+      "default": "en"
+    },
+    "target": {
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 64
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "segment": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "request_id",
+    "action"
+  ],
+  "additionalProperties": false
+}

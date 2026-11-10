@@ -1,0 +1,63 @@
+# Phase 03 · Audience questions and the speaker brief
+
+## Rehearse with two phones
+
+To caption an English-language video, open it in another desktop Chrome tab. In the speaker console choose **Browser tab audio**, then **Start talk**. Select the video tab, enable **Share tab audio**, and press **Share**. Play the video when the console shows **Capturing tab audio**. Attendees use the same room link.
+
+- For live voice, leave **Live microphone** selected and press **Start talk** on the speaker console. For the seeded Q&A rehearsal, select **Sample replay**. Both phones follow the same room.
+- Reload one phone during playback to check catch-up. Hold the speaker's end control for three seconds and check that both phones finish on the same caption after the five-second drain.
+
+Open `/?room=demoen` on both phones and `/speaker?room=demoen` on the speaker's screen. All three devices must use the same server and room code. For a fresh queue, choose another six-character code made of lowercase letters or digits. Start the talk on the speaker's screen. When the second sample caption appears (12:04 on screen, ten seconds into playback), both phones have the citation for the Q&A rehearsal.
+
+| Time | On the device | On the speaker screen |
+|---|---|---|
+| 0–20 s | On phone 1, open **Q&A → Ask a question → Question options → Use sample question → Send question**. Read the quote at 12:04 and select **Still ask**. | Recovery moves from one supporter to two. Delay also has two and stays first because it was asked earlier. |
+| 20–40 s | On phone 2, choose **Question options → Use sample follow-up → Send question**. The attendee asks how much history they can recover after twenty minutes. | Recovery moves into first place with three supporters. The new detail appears under it. |
+| 40–60 s | Open **Speaker brief** on the recovery question. | The speaker sees the audience's question, the exact caption about reconnecting, and the open question about how far back recovery goes. |
+
+After the rehearsal, try “How much mobile data does recovery use?” by sending it as a new draft. The service checks whether it belongs with an existing question. Try “Where can I find tomorrow’s schedule?” to exercise independent publication. Supporting the twenty-minute follow-up from phone 1 adds a vote to that detail while keeping the group's total at three.
+
+## Run it on the local network
+
+In `backend/`, run `uv run --env-file ../.env uvicorn roompass.api:app --host 127.0.0.1 --port 8000`. In `web/`, run `pnpm build`, then `pnpm preview --host 0.0.0.0`. Open the Network address printed by Vite on both phones. The speaker can open the brief before starting the microphone.
+
+A single backend replica stores room contributions in SQLite. Set `ROOMPASS_DEMO_DB` to choose the database file. With `ES_URL` and `ES_API_KEY` set, run `uv run --env-file ../.env python -m roompass.qa_search` from `backend/` to index the seven sample captions in `segments` under talk ID `rpdemo`. Live talks index their own captions as they arrive. The phone checks the original draft against the current talk using Elasticsearch keyword and semantic retrieval. It shows the matching caption and score when the search marks it as possibly covered and the caption has reached the phone.
+
+To test against the deployed voice API, set `ROOMPASS_DEV_LIVE_BACKEND=https://the-mok-team.cnh.radarhq.io` when running Vite. The proxy sends `/api/talks` requests to the deployed backend and room requests to the local API. Configure the local API with access to the same Elasticsearch deployment so it can verify the talk and retrieve its captions.
+
+Set `ROOMPASS_QA_DECISIONS=1` and `OPENAI_API_KEY` in the private backend environment for AI routing. The model compares the draft to up to eight room questions or follow-ups and suggests whether to count support, attach a follow-up or add a new question. The server caches repeated routing decisions and allows up to 30 routing calls per run. [OpenAI Decisions API](https://developers.openai.com/api/docs/guides/decisions)
+
+## Submitting a question
+
+Type in English or Spanish. The server detects the language, keeps the original wording for attendees, and uses English for grouping and for the speaker brief. Switching the EN/ES control changes the interface and captions on that device. After publication the phone shows **Question received**, quotes the original draft, and explains how it counted. Tap **Done** to return to the queue.
+
+The translation model defaults to `gpt-4.1-mini` and can be set with `ROOMPASS_QA_TRANSLATION_MODEL`. To update a pre-existing demo database, run `uv run --env-file ../.env python -m roompass.question_language` from `backend/`. Each invocation translates up to 30 distinct older drafts in one request.
+
+Attendees type a question and press **Send question**. If a visible caption may answer it, the attendee can close the draft with **This answers it**, or continue with **Still ask**. Otherwise the service submits immediately. A receipt explains the result.
+
+| Relationship | Queue update |
+|---|---|
+| The same answer resolves both questions. | Count support for the matching question or follow-up. |
+| The draft asks for a new condition, limit or example. | Attach the original wording as a follow-up to the relevant group. |
+| The relationship is weak or the topic is new. | Publish independently. |
+
+Without a model response the server recognizes identical questions and the two rehearsal examples. It publishes uncertain drafts independently. Reading a citation or closing the draft contributes zero votes.
+
+## Ranking and the speaker brief
+
+Count one anonymous device per group, including people who ask, support or expand it. Rank groups by that count, then by age. Within a group, sort follow-ups by their own distinct supporters, with the older follow-up first in a tie. The API handles concurrent submissions and retries so the same action counts once.
+
+| Brief field | Example after the second phone submits |
+|---|---|
+| Asked by the room | “Do captions catch up when I reconnect?” · 3 supporters |
+| Already discussed | “When a phone reconnects, it picks up the captions it missed.” · 12:04 |
+| What to clarify | “If I reconnect after twenty minutes, how much caption history can I recover?” |
+
+The brief uses the original question, the cited caption, and the most supported follow-up. The speaker can expand other submitted wordings. When no citation is available, the card says **No caption reference found**.
+
+## Next steps for live talks
+
+- Evaluate coverage thresholds on more paraphrases, requests for an extra detail, and questions that share only a topic.
+- Index presenter materials shared with the audience and cite the page or slide. Refresh evidence when a later caption addresses a queued question.
+- Keep outstanding follow-ups visible after the speaker answers the main question and rank the group by the remaining demand.
+- Evaluate cross-language grouping and a generated brief that cites only verified source passages. Fall back to the template when citations are missing. See the [project brief](../brief/brief.md) and [AI rules](../.claude/rules/ai.md).
