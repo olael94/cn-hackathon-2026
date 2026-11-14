@@ -15,7 +15,7 @@ resources:
 images:
   - name: web
     newName: ghcr.io/olael94/cn-hackathon-2026
-    newTag: "web-bc9e6f9"
+    newTag: "web-79a9ac4"
   - name: backend
     newName: ghcr.io/olael94/cn-hackathon-2026
-    newTag: backend-bc9e6f9
+    newTag: backend-79a9ac4
