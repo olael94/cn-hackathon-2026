@@ -16,7 +16,6 @@ export function useDemoRoom(speaker: boolean, language: 'en' | 'es') {
   })
   const session = state.data
   const voiceId = session?.voice_id
-  const feed = useVoiceCaptions(voiceId)
   const disconnected = state.isError || state.fetchStatus === 'paused'
   const now = session
     ? session.server_ms + Math.max(0, clockTick - session.anchor)
@@ -26,6 +25,7 @@ export function useDemoRoom(speaker: boolean, language: 'en' | 'es') {
   const finish = stopped === null ? null : stopped + 5000
   const phase: 'waiting' | 'live' | 'draining' | 'ended' = started === null ? 'waiting'
     : finish === null ? 'live' : now < finish ? 'draining' : 'ended'
+  const feed = useVoiceCaptions(voiceId, phase === 'ended')
   const until = Math.min(now, finish ?? Infinity)
   const count = started === null ? 0 : Math.max(0, 1 + Math.floor((until - started - 2000) / 8000))
   const visible = voiceId ? (feed?.lines ?? []).map(line => ({
